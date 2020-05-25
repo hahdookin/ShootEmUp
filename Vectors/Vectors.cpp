@@ -98,7 +98,7 @@ struct Enemy
 		this->healthPoints = hp;
 		this->radius = 20.0f;
 	};
-	void SetAngleToPlayer(olc::vf2d& pPos)
+	void SetAngleToEntity(olc::vf2d& pPos)
 	{
 		this->angle = atan2f(pPos.y - this->pos.y, pPos.x - this->pos.x);
 	}
@@ -147,7 +147,7 @@ public:
 
 		// Creating and placing enemies initially
 		for (int i = 0; i < 10; i++)
-			vEnemies.push_back(Enemy(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, (rand() % 10) + 3));
+			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, (rand() % 10) + 3));
 
 		return true;
 	}
@@ -174,14 +174,19 @@ public:
 	{
 		return (pos.x > ScreenWidth() || pos.x < 0 || pos.y > ScreenHeight() || pos.y < 0);
 	}
+	
+	olc::vf2d CenterTextPosistion(size_t size, uint32_t scale = 1)
+	{
+		return olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 4.0f * scale);
+	}
 
 	std::array<olc::vf2d, 1000> arrStars;
 
 	// Starting player pos and velocity and other things
 	olc::vf2d pos = { ScreenWidth() / 2, ScreenHeight() / 2 };
-	olc::vf2d rotPosA = {};
-	olc::vf2d rotPosB = {};
-	olc::vf2d rotPosC = {};
+	olc::vf2d rotPosRight = {};
+	olc::vf2d rotPosLeft = {};
+	olc::vf2d rotPosNose = {};
 
 	//float fVelocity = 150.0f;
 	float fVelocity = 0.0f;
@@ -190,14 +195,15 @@ public:
 
 	float fRotation = 0.0f;
 	float fRotationSpeed = 7.0f;
-	float lineRay = 20.0f; // Single main ray casted out on circle magnitude
+	float lineRay = 15.0f; // Magnitude of triangle edges
 	float fShotDelay = 0.1f;
 
-	std::vector<Bullet> vBullets = {};
-	std::vector<Enemy> vEnemies = {};
-	std::vector<Particle> vParticles = {};
+	std::vector<std::unique_ptr<Bullet>> vBullets = {};
+	std::vector<std::unique_ptr<Enemy>> vEnemies = {};
+	std::vector<std::unique_ptr<Particle>> vParticles = {};
 
 	bool bSingleMode = true;
+	bool bPowerUp = false;
 	float fAccumulatedTime = 0.0f;
 
 	bool OnUserUpdate(float fElapsedTime) override
@@ -207,17 +213,18 @@ public:
 		if (GetKey(olc::V).bPressed) fAcceleration += 10;
 		if (GetKey(olc::C).bPressed) fRotationSpeed += 10;
 		if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
-		if (GetKey(olc::M).bHeld) vEnemies.push_back(Enemy(0.0f, 0.0f, 40.0f, 10));
+		if (GetKey(olc::M).bHeld) vEnemies.push_back(std::make_unique<Enemy>(0.0f, 0.0f, (rand() % 100) + 10, 10));
 #endif
 
 		// Shoot bullets
 		if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
+		if (GetKey(olc::G).bPressed) bPowerUp = !bPowerUp;
 		if (bSingleMode) 
 		{
 			if (GetKey(olc::SPACE).bPressed)
 			{
-				rotPosC = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-				vBullets.push_back(Bullet(rotPosC.x, rotPosC.y, 200.0f, fRotation));
+				rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
+				vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
 			}
 		} 
 		else 
@@ -227,8 +234,12 @@ public:
 				fAccumulatedTime += fElapsedTime;
 				if (fAccumulatedTime >= fShotDelay)
 				{
-					rotPosC = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-					vBullets.push_back(Bullet(rotPosC.x, rotPosC.y, 200.0f, fRotation));
+					rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
+					vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
+					if (bPowerUp) {
+						vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation + PI / 18));
+						vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation - PI / 18));
+					}
 					fAccumulatedTime = 0.0f;
 				}
 				
@@ -248,19 +259,22 @@ public:
 		}
 		if (GetKey(olc::S).bHeld)
 		{
-			pos.y -= fAcceleration/2 * sinf(fRotation) * fElapsedTime;
-			pos.x -= fAcceleration/2 * cosf(fRotation) * fElapsedTime;
-			//if (fVelocity >= -fMaxVelocity) fVelocity -= fAcceleration * fElapsedTime;
+			if (fVelocity >= -fMaxVelocity/2) fVelocity -= fAcceleration * fElapsedTime;
 		}
-		if (fVelocity > 0.0f) 
+		
+		if (fVelocity != 0)
 		{
 			pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
 			pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
 		}
-		// Start decellerating if not pressing forward 
-	    // TODO: Fix decceleration
-		if(!GetKey(olc::W).bHeld && fVelocity != 0) fVelocity = (fVelocity - fAcceleration*fElapsedTime > 0) ? fVelocity - fAcceleration*fElapsedTime : 0.0f;
+
+		// Start decellerating
+		if (!GetKey(olc::W).bHeld && fVelocity > 0) 
+			fVelocity = (fVelocity - fAcceleration*fElapsedTime > 0) ? fVelocity - fAcceleration*fElapsedTime : 0.0f;
 		
+		if (!GetKey(olc::S).bHeld && fVelocity < 0)
+			fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
+
 		// Keep rotation within 2 PI
 		while (fRotation < 0) fRotation += TWO_PI;
 		while (fRotation > TWO_PI) fRotation -= TWO_PI;
@@ -286,24 +300,24 @@ public:
 		}
 
 		// Draw bullets shot out
-		if (vBullets.size() > 0) RemoveLambda(vBullets, [this](Bullet& b) { return IsOffScreen(b.pos); });
+		if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 		for (auto& bullet : vBullets)
 		{
 			// Update bullet's posistion and draw it
-			bullet.pos.x += bullet.shotSpeed * cosf(bullet.angle) * fElapsedTime;
-			bullet.pos.y += bullet.shotSpeed * sinf(bullet.angle) * fElapsedTime;
-			DrawCircle(bullet.pos, bullet.radius);
+			bullet->pos.x += bullet->shotSpeed * cosf(bullet->angle) * fElapsedTime;
+			bullet->pos.y += bullet->shotSpeed * sinf(bullet->angle) * fElapsedTime;
+			DrawCircle(bullet->pos, bullet->radius);
 			
 			// Check if bullet has come into contact with an enemy
 			for (auto& enemy : vEnemies)
 			{
-				if (Between(bullet.pos.x, enemy.pos.x - enemy.radius, enemy.pos.x + enemy.radius) && 
-					Between(bullet.pos.y, enemy.pos.y - enemy.radius, enemy.pos.y + enemy.radius))
+				if (Between(bullet->pos.x, enemy->pos.x - enemy->radius, enemy->pos.x + enemy->radius) &&
+					Between(bullet->pos.y, enemy->pos.y - enemy->radius, enemy->pos.y + enemy->radius))
 				{
-					bullet.pos.x = ScreenWidth() + 1;
-					bullet.pos.y = ScreenHeight() + 1;
-					enemy.ReduceHP(1);
-					enemy.isHit = true;
+					bullet->pos.x = ScreenWidth() + 1;
+					bullet->pos.y = ScreenHeight() + 1;
+					enemy->ReduceHP(1);
+					enemy->isHit = true;
 				}
 			}
 		} 
@@ -311,44 +325,54 @@ public:
 		// Draw enemies on screen and check if enemy is dead
 		for (auto& enemy : vEnemies)
 		{
-			if (enemy.healthPoints == 0) 
+			if (enemy->healthPoints == 0)
 			{ 
 				// Explosion
 				for (int i = 0; i < 1000; i++) // 1000 paricles o.O
-					vParticles.push_back(Particle(enemy.pos.x, enemy.pos.y));
+					vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
 			    continue; 
 			}
 
-			enemy.SetAngleToPlayer(pos);
-			enemy.pos.x += enemy.speed * cosf(enemy.angle) * fElapsedTime;
-			enemy.pos.y += enemy.speed * sinf(enemy.angle) * fElapsedTime;
-			FillCircle(enemy.pos, enemy.radius, (enemy.isHit ? olc::YELLOW : olc::RED));
-			DrawCircle(enemy.pos, enemy.radius, RandColor());
-			if (enemy.isHit) for (int i = 0; i < 10; i++) vParticles.push_back(Particle(enemy.pos.x, enemy.pos.y));
-			if (enemy.isHit) enemy.isHit = false;
+			enemy->SetAngleToEntity(pos);
+			enemy->pos.x += enemy->speed * cosf(enemy->angle) * fElapsedTime;
+			enemy->pos.y += enemy->speed * sinf(enemy->angle) * fElapsedTime;
+			FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : olc::RED));
+			DrawCircle(enemy->pos, enemy->radius, RandColor());
+			if (enemy->isHit) for (int i = 0; i < 10; i++) vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
+			if (enemy->isHit) enemy->isHit = false;
 		}
-		if (vEnemies.size() > 0) RemoveLambda(vEnemies, [](Enemy& e) { return e.healthPoints == 0; }); // Has to come after because drawing explosion
+		if (vEnemies.size() > 0) RemoveLambda(vEnemies, [](std::unique_ptr<Enemy>& e) { return e->healthPoints == 0; }); // Has to come after because drawing explosion
 
 		// Draw particles and remove 
-		if (vParticles.size() > 0) RemoveLambda(vParticles, [this](Particle& p) { return IsOffScreen(p.pos); });
+		if (vParticles.size() > 0) RemoveLambda(vParticles, [this](std::unique_ptr<Particle>& p) { return IsOffScreen(p->pos); });
 		for (auto& p : vParticles)
 		{
-			p.pos.x += p.speed * cosf(p.angle) * fElapsedTime;
-			p.pos.y += p.speed * sinf(p.angle) * fElapsedTime;
-			Draw(p.pos);
+			p->pos.x += p->speed * cosf(p->angle) * fElapsedTime;
+			p->pos.y += p->speed * sinf(p->angle) * fElapsedTime;
+			Draw(p->pos);
 		}
 		
 
-		// Update points of triangle ship and draw new position of player /\ 
-		rotPosA = { pos.x - lineRay * cosf(fRotation - PI/6), pos.y - lineRay * sinf(fRotation - PI/6) };
-		rotPosB = { pos.x - lineRay * cosf(fRotation + PI/6), pos.y - lineRay * sinf(fRotation + PI/6) };
-		rotPosC = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; 
+		// Update points of triangle ship and draw new position of player
+		rotPosRight = { pos.x - lineRay * cosf(fRotation - PI/6), pos.y - lineRay * sinf(fRotation - PI/6) };
+		rotPosLeft = { pos.x - lineRay * cosf(fRotation + PI/6), pos.y - lineRay * sinf(fRotation + PI/6) };
+		rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; 
 
-		DrawLine(rotPosC, rotPosA, olc::RED);
-		DrawLine(rotPosC, rotPosB, olc::RED);
+		//DrawLine(rotPosC, rotPosA, olc::RED);
+		//DrawLine(rotPosC, rotPosB, olc::RED);
+		//FillTriangle(rotPosRight, rotPosLeft, rotPosNose, olc::DARK_GREY);
+		//DrawTriangle(rotPosRight, rotPosLeft, rotPosNose, olc::VERY_DARK_GREY);
+		DrawLine(rotPosNose, rotPosLeft);
+		DrawLine(rotPosLeft, pos);
+		DrawLine(pos, rotPosRight);
+		DrawLine(rotPosRight, rotPosNose);
 
-
-		//if (vEnemies.size() == 0) FillRect(0, 0, ScreenWidth(), ScreenHeight(), olc::Pixel(0, 0, 0, 255));
+		if (vEnemies.size() == 0)
+		{
+			std::string lc = "GOD I LOVE\nRICK AND MORTY";
+			//olc::vf2d mid = { (ScreenWidth() / 2.0f) - (lc.size()*8)/2.0f , (ScreenHeight() / 2.0f)-4.0f };
+			DrawString(CenterTextPosistion(lc.size(), 2), lc, olc::WHITE, 2);
+		}
 
 #if DEBUGMODE
 		DrawString(5, 5, "x: " + std::to_string(pos.x));
@@ -373,7 +397,6 @@ public:
 int main()
 {
 	Rays demo;
-	//if (demo.Construct(256, 240, 4, 4))
 	if (demo.Construct(640, 480, 2, 2))
 		demo.Start();
 
