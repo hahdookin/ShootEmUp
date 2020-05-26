@@ -2,52 +2,12 @@
 #include "olcPixelGameEngine.h"
 #include <string>
 #include <vector>
-#include <cmath>
+//#include <cmath>
 #include <array>
 #include <algorithm>
 
 constexpr double PI = 3.14159265359;
 constexpr double TWO_PI = PI * 2;
-
-template<class T>
-struct Vector
-{
-	T i;
-	T j;
-	Vector() { this->i = 0.0f; this->j = 0.0f; }
-	Vector(T i, T j) : i(i), j(j) {};
-
-	inline double mag() { return sqrt(this->i * this->i + this->j * this->j); }
-
-	inline void print()
-	{
-		std::cout << this->i << 'i' << (this->j < 0 ? " - " : " + ") << abs(this->j) << 'j' << std::endl;
-	}
-
-	inline double angle_r()
-	{
-		double ang = atan2(this->j, this->i);
-		return (ang >= 0.0f ? ang : ang + 2 * PI);
-	}
-
-	inline double angle_d()
-	{
-		double ang = atan2(this->j, this->i) * (180 / PI);
-		return (ang >= 0.0f ? ang : ang + 360);
-	}
-
-	inline T dot_product(Vector<T> &other)	{ return (this->i * other.i + this->j * other.j); }
-
-	inline Vector operator + (const Vector& rhs) const { return Vector(this->i + rhs.i, this->j + rhs.j); }
-	inline Vector operator - (const Vector& rhs) const { return Vector(this->i - rhs.i, this->j - rhs.j); }
-	inline Vector operator * (const T& rhs) const { return Vector(this->i * rhs, this->j * rhs); }
-	inline Vector operator / (const T& rhs) const { return Vector(this->i / rhs, this->j / rhs); }
-	
-};
-
-typedef Vector<int> vi;
-typedef Vector<float> vf;
-typedef Vector<double> vd;
 
 struct Bullet
 {
@@ -147,16 +107,16 @@ public:
 
 		// Creating and placing enemies initially
 		for (int i = 0; i < 10; i++)
-			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, (rand() % 10) + 3));
+			//vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f,  3));
 
 		return true;
 	}
 
 	// More concise erase remove idiom
 	template<class T, typename Lambda>
-	bool RemoveLambda(std::vector<T>& v, Lambda&& f)
+	bool RemoveLambda(std::vector<T>& v, Lambda&& func)
 	{
-		v.erase(std::remove_if(v.begin(), v.end(), f), v.end());
+		v.erase(std::remove_if(v.begin(), v.end(), func), v.end());
 		return false;
 	}
 
@@ -177,7 +137,7 @@ public:
 	
 	olc::vf2d CenterTextPosistion(size_t size, uint32_t scale = 1)
 	{
-		return olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 4.0f * scale);
+		return olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale);
 	}
 
 	std::array<olc::vf2d, 1000> arrStars;
@@ -192,6 +152,7 @@ public:
 	float fVelocity = 0.0f;
 	float fAcceleration = 150.0f;
 	float fMaxVelocity = 150.0f;
+	float fMaxVelocityMod = 250.0f;
 
 	float fRotation = 0.0f;
 	float fRotationSpeed = 7.0f;
@@ -206,6 +167,9 @@ public:
 	bool bPowerUp = false;
 	float fAccumulatedTime = 0.0f;
 
+	std::string lc = "Level Complete";
+	olc::Pixel whiteFadeIn = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
+
 	bool OnUserUpdate(float fElapsedTime) override
 	{
 #define DEBUGMODE 1
@@ -215,19 +179,52 @@ public:
 		if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
 		if (GetKey(olc::M).bHeld) vEnemies.push_back(std::make_unique<Enemy>(0.0f, 0.0f, (rand() % 100) + 10, 10));
 #endif
+		
+		
+		// Speed modifier
+		if (GetKey(olc::SHIFT).bHeld) fMaxVelocity = 250.0f;
+		else fMaxVelocity = 150.0f;
+
+		// Rotation and movement Keys
+		if (GetKey(olc::A).bHeld) fRotation -= fRotationSpeed * fElapsedTime;
+		if (GetKey(olc::D).bHeld) fRotation += fRotationSpeed * fElapsedTime;
+		if (GetKey(olc::W).bHeld) 
+		{
+			if (fVelocity >= fMaxVelocity) fVelocity -= fAcceleration * fElapsedTime; // Decrease smoothly after speed mod
+			else if (fVelocity <= fMaxVelocity) fVelocity += fAcceleration * fElapsedTime; // Increase velocity by acceleration
+		}
+		if (GetKey(olc::S).bHeld)
+		{
+			if (fVelocity <= -fMaxVelocity / 2.0f) fVelocity += fAcceleration * fElapsedTime;
+			else if (fVelocity >= -fMaxVelocity / 2.0f) fVelocity -= fAcceleration * fElapsedTime;
+		}
+		
+		// Move player
+		if (fVelocity != 0)
+		{
+			pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
+			pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
+		}
+
+		// Start decellerating
+		if (!GetKey(olc::W).bHeld && fVelocity > 0) 
+			fVelocity = (fVelocity - fAcceleration*fElapsedTime > 0) ? fVelocity - fAcceleration*fElapsedTime : 0.0f;
+		
+		if (!GetKey(olc::S).bHeld && fVelocity < 0)
+			fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
 
 		// Shoot bullets
 		if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
 		if (GetKey(olc::G).bPressed) bPowerUp = !bPowerUp;
-		if (bSingleMode) 
+		if (bSingleMode)
 		{
 			if (GetKey(olc::SPACE).bPressed)
 			{
 				rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
 				vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
 			}
-		} 
-		else 
+		}
+		else
 		{
 			if (GetKey(olc::SPACE).bHeld)
 			{
@@ -242,38 +239,10 @@ public:
 					}
 					fAccumulatedTime = 0.0f;
 				}
-				
+
 			}
 		}
 
-		// TODO: FIX THIS
-		if (GetKey(olc::SHIFT).bHeld) fMaxVelocity = 250.0f;
-		else fMaxVelocity = 150.0f;
-
-		// Rotation and Movement Keys
-		if (GetKey(olc::A).bHeld) fRotation -= fRotationSpeed * fElapsedTime;
-		if (GetKey(olc::D).bHeld) fRotation += fRotationSpeed * fElapsedTime;
-		if (GetKey(olc::W).bHeld) 
-		{
-			if (fVelocity <= fMaxVelocity) fVelocity += fAcceleration * fElapsedTime; // Increase velocity by acceleration
-		}
-		if (GetKey(olc::S).bHeld)
-		{
-			if (fVelocity >= -fMaxVelocity/2) fVelocity -= fAcceleration * fElapsedTime;
-		}
-		
-		if (fVelocity != 0)
-		{
-			pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
-			pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
-		}
-
-		// Start decellerating
-		if (!GetKey(olc::W).bHeld && fVelocity > 0) 
-			fVelocity = (fVelocity - fAcceleration*fElapsedTime > 0) ? fVelocity - fAcceleration*fElapsedTime : 0.0f;
-		
-		if (!GetKey(olc::S).bHeld && fVelocity < 0)
-			fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
 
 		// Keep rotation within 2 PI
 		while (fRotation < 0) fRotation += TWO_PI;
@@ -294,9 +263,11 @@ public:
 		// Drawing stars
 		for (int i = 0; i < arrStars.size(); i++)
 		{
-			arrStars[i].y += ((i < 300) ? 7.0f : 10.0f) * fElapsedTime;
+			//arrStars[i].y += ((i < 300) ? 7.0f : 10.0f) * fElapsedTime;
+			arrStars[i].y += ((i < 150) ? 7.0f : (i < 500) ? 8.5f : 10.0f) * fElapsedTime;
 			if (arrStars[i].y > ScreenHeight()) arrStars[i] = { (float)(rand() % ScreenWidth()), 0.0f };
-			Draw(arrStars[i], ((i < 300) ? olc::VERY_DARK_GREY : olc::WHITE));
+			//Draw(arrStars[i], ((i < 300) ? olc::VERY_DARK_GREY : olc::WHITE));
+			Draw(arrStars[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
 		}
 
 		// Draw bullets shot out
@@ -321,14 +292,14 @@ public:
 				}
 			}
 		} 
-		
+
 		// Draw enemies on screen and check if enemy is dead
 		for (auto& enemy : vEnemies)
 		{
 			if (enemy->healthPoints == 0)
 			{ 
 				// Explosion
-				for (int i = 0; i < 1000; i++) // 1000 paricles o.O
+				for (int i = 0; i < 100; i++) // 1000 paricles o.O
 					vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
 			    continue; 
 			}
@@ -358,33 +329,33 @@ public:
 		rotPosLeft = { pos.x - lineRay * cosf(fRotation + PI/6), pos.y - lineRay * sinf(fRotation + PI/6) };
 		rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; 
 
-		//DrawLine(rotPosC, rotPosA, olc::RED);
-		//DrawLine(rotPosC, rotPosB, olc::RED);
-		//FillTriangle(rotPosRight, rotPosLeft, rotPosNose, olc::DARK_GREY);
-		//DrawTriangle(rotPosRight, rotPosLeft, rotPosNose, olc::VERY_DARK_GREY);
 		DrawLine(rotPosNose, rotPosLeft);
 		DrawLine(rotPosLeft, pos);
 		DrawLine(pos, rotPosRight);
 		DrawLine(rotPosRight, rotPosNose);
 
+		// Check if player has won
 		if (vEnemies.size() == 0)
 		{
-			std::string lc = "GOD I LOVE\nRICK AND MORTY";
-			//olc::vf2d mid = { (ScreenWidth() / 2.0f) - (lc.size()*8)/2.0f , (ScreenHeight() / 2.0f)-4.0f };
-			DrawString(CenterTextPosistion(lc.size(), 2), lc, olc::WHITE, 2);
+			// Fade in 'Level Complete' text
+			if (whiteFadeIn.a < 255.0f)
+				whiteFadeIn.a = (whiteFadeIn.a + 200.0f * fElapsedTime < 255) ? whiteFadeIn.a + 200.0f * fElapsedTime : 255;
+			DrawString(CenterTextPosistion(lc.size(), 2), lc, whiteFadeIn, 2);
 		}
+		else whiteFadeIn.a = 0;
 
 #if DEBUGMODE
-		DrawString(5, 5, "x: " + std::to_string(pos.x));
+		DrawString(5,  5, "x: " + std::to_string(pos.x));
 		DrawString(5, 15, "y: " + std::to_string(pos.y));
 		DrawString(5, 25, "a: " + std::to_string(fRotation));
 		DrawString(5, 35, "v: " + std::to_string(fVelocity));
 		std::string msg = bSingleMode ? "Single" : "Burst";
-		DrawString(5, 45, "b: " + msg );
+		DrawString(5, 45, "b: " + msg);
 		DrawString(5, 55, "Bn: " + std::to_string(vBullets.size()));
 		DrawString(5, 65, "En: " + std::to_string(vEnemies.size()));
 		DrawString(5, 75, "Pn: " + std::to_string(vParticles.size()));
 		DrawString(5, 85, "da: " + std::to_string(fRotationSpeed));
+		DrawString(5, 95, "Wa: " + std::to_string(whiteFadeIn.a));
 #endif
 
 		return true;
@@ -393,12 +364,11 @@ public:
 
 
 
-
 int main()
 {
-	Rays demo;
-	if (demo.Construct(640, 480, 2, 2))
-		demo.Start();
+	Rays game;
+	if (game.Construct(640, 480, 2, 2))
+		game.Start();
 
 	return 0;
 }
