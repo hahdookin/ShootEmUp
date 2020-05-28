@@ -8,8 +8,7 @@
 // Todo:
 // - Make a function to fade in a pixel
 //    - Fix all issues that need to use this function
-// - Fix rotation acceleration if I even want that
-// - Add Help Screen
+// - Make Help screen sexier
 
 constexpr float PI = 3.14159265359f;
 constexpr float TWO_PI = PI * 2.0f;
@@ -93,7 +92,16 @@ struct Particle
 	}
 };
 
-
+void DrawStars(olc::PixelGameEngine* pge, std::array<olc::vf2d, 1000>& arr, float elapsedTime, bool update = true)
+{
+	// Drawing stars
+	for (int i = 0; i < arr.size(); i++)
+	{
+		if (update) arr[i].y += ((i < 150) ? 7.0f : (i < 500) ? 8.5f : 10.0f) * elapsedTime;
+		if (update) if (arr[i].y > pge->ScreenHeight()) arr[i] = { (float)(rand() % pge->ScreenWidth()), 0.0f };
+		pge->Draw(arr[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
+	}
+}
 
 class Rays : public olc::PixelGameEngine
 {
@@ -116,7 +124,7 @@ public:
 
 		// Creating and placing enemies initially
 		for (int i = 0; i < 5; i++)
-			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f,  2));
+			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, 2));
 
 		return true;
 	}
@@ -143,7 +151,7 @@ public:
 	{
 		return (pos.x > ScreenWidth() || pos.x < 0 || pos.y > ScreenHeight() || pos.y < 0);
 	}
-	
+
 	olc::vf2d CenterTextPosistion(size_t size, uint32_t scale = 1, olc::vf2d offset = { 0.0f, 0.0f })
 	{
 		return (olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale) + offset);
@@ -185,39 +193,46 @@ public:
 	float fAccumulatedTime = 0.0f;
 	int nSelected = 0;
 
-	
+
 	olc::Pixel whiteFadeIn = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
 	olc::Pixel whiteFadeIn2 = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
 
 	// Game states
-	enum class STATE {
-		MAIN_SCREEN, LEVEL, LEVEL_COMPLETE, PAUSE
+	enum STATE {
+		MAIN_SCREEN, HELP_SCREEN, LEVEL, LEVEL_COMPLETE, PAUSE
 	} nCurState;
 
-	std::string gameName[4] = { "Shoot 'em UP!", "Play", "Help", "Exit" };
+	std::vector<std::string> arrMainScreen = { 
+		"Shoot 'em UP!", 
+		"Play", 
+		"Help", 
+		"Exit" };
+	std::vector<std::string> arrHelpScreen = 
+	{ 
+		"W A S D - Move and turn", 
+		"SHIFT - Hold to increase speed", 
+		"SPACE - Fire", 
+		"B - Toggle Auto Firing"
+	};
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		Clear(olc::BLACK);
+
+		// Update position only if not in Pause state
+		DrawStars(this, arrStars, fElapsedTime, (nCurState != STATE::PAUSE));
+
 		// Handling game states
 		switch (nCurState)
 		{
 			case STATE::MAIN_SCREEN:
 			{
-				Clear(olc::BLACK);
-
-				// Drawing stars
-				for (int i = 0; i < arrStars.size(); i++)
-				{
-					arrStars[i].y += ((i < 150) ? 7.0f : (i < 500) ? 8.5f : 10.0f) * fElapsedTime;
-					if (arrStars[i].y > ScreenHeight()) arrStars[i] = { (float)(rand() % ScreenWidth()), 0.0f };
-					Draw(arrStars[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
-				}
 
 				// This WHOLE THING is a hack !!! edit: IDK i kinda like it
-				olc::vf2d vTitlePos = CenterTextPosistion(gameName[0].size(), 3U, { 0.0f, -75.0f });
-				olc::vf2d vPlayPos = CenterTextPosistion(gameName[1].size(), 2U, { 0.0f, 0.0f });
-				olc::vf2d vHelpPos = CenterTextPosistion(gameName[2].size(), 2U, { 0.0f, 50.0f });
-				olc::vf2d vExitPos = CenterTextPosistion(gameName[3].size(), 2U, { 0.0f, 100.0f });
+				olc::vf2d vTitlePos = CenterTextPosistion(arrMainScreen[0].size(), 3U, { 0.0f, -75.0f });
+				olc::vf2d vPlayPos = CenterTextPosistion(arrMainScreen[1].size(), 2U, { 0.0f, 0.0f });
+				olc::vf2d vHelpPos = CenterTextPosistion(arrMainScreen[2].size(), 2U, { 0.0f, 50.0f });
+				olc::vf2d vExitPos = CenterTextPosistion(arrMainScreen[3].size(), 2U, { 0.0f, 100.0f });
 
 				if (GetKey(olc::W).bPressed) nSelected--;
 				if (GetKey(olc::S).bPressed) nSelected++;
@@ -228,16 +243,33 @@ public:
 				if (GetKey(olc::ENTER).bPressed || GetKey(olc::SPACE).bPressed)
 				{
 					if (nSelected == 0) nCurState = STATE::LEVEL;
-					if (nSelected == 1) {} // Help Screen
+					if (nSelected == 1) nCurState = STATE::HELP_SCREEN;
 					if (nSelected == 2) return false; // Exit game
 				}
 
-				DrawString(vTitlePos, gameName[0], olc::WHITE, 3U);
-				DrawString(vPlayPos, gameName[1], (nSelected == 0 ? olc::RED : olc::WHITE), 2U);
-				DrawString(vHelpPos, gameName[2], (nSelected == 1 ? olc::RED : olc::WHITE), 2U);
-				DrawString(vExitPos, gameName[3], (nSelected == 2 ? olc::RED : olc::WHITE), 2U);
+				DrawString(vTitlePos, arrMainScreen[0], olc::WHITE, 3U);
+				DrawString(vPlayPos, arrMainScreen[1], (nSelected == 0 ? olc::RED : olc::WHITE), 2U);
+				DrawString(vHelpPos, arrMainScreen[2], (nSelected == 1 ? olc::RED : olc::WHITE), 2U);
+				DrawString(vExitPos, arrMainScreen[3], (nSelected == 2 ? olc::RED : olc::WHITE), 2U);
 
 				return true; // for now
+			}
+			break;
+			case STATE::HELP_SCREEN:
+			{
+				float offset = 10.0f;
+				float dy = (float)ScreenHeight() / (float)arrHelpScreen.size();
+				for (size_t i = 0; i < arrHelpScreen.size(); i++)
+				{
+					DrawString(0, offset, arrHelpScreen[i], olc::WHITE, 2U);
+					offset += dy;
+				}
+
+
+				if (GetKey(olc::SPACE).bPressed || GetKey(olc::ENTER).bPressed || GetKey(olc::ESCAPE).bPressed)
+					nCurState = STATE::MAIN_SCREEN;
+
+				return true;
 			}
 			break;
 			case STATE::LEVEL:
@@ -254,13 +286,6 @@ public:
 			break;
 			case STATE::PAUSE:
 			{
-				// Display
-				Clear(olc::BLACK);
-
-				// Drawing stars
-				for (int i = 0; i < arrStars.size(); i++)
-					Draw(arrStars[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
-
 				// Draw bullets shot out
 				for (auto& bullet : vBullets)
 					DrawCircle(bullet->pos, bullet->radius);
@@ -293,8 +318,9 @@ public:
 
 #define DEBUGMODE 1
 #if DEBUGMODE
-		if (GetKey(olc::V).bPressed) fAcceleration += 10;
-		if (GetKey(olc::C).bPressed) fRotVelocity += 10;
+		if (GetKey(olc::V).bPressed) fAcceleration += 10.0f;
+		if (GetKey(olc::C).bPressed) fRotVelocity += 10.0f;
+		if (GetKey(olc::X).bPressed) fRotVelocity -= 10.0f;
 		if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
 		if (GetKey(olc::M).bHeld) vEnemies.push_back(std::make_unique<Enemy>(0.0f, 0.0f, (rand() % 100) + 10, 10));
 #endif
@@ -393,19 +419,6 @@ public:
 		if (pos.y <= 0) pos.y = 0;
 
 
-		
-
-		// Display
-		Clear(olc::BLACK);
-
-		// Drawing stars
-		for (int i = 0; i < arrStars.size(); i++)
-		{
-			arrStars[i].y += ((i < 150) ? 7.0f : (i < 500) ? 8.5f : 10.0f) * fElapsedTime;
-			if (arrStars[i].y > ScreenHeight()) arrStars[i] = { (float)(rand() % ScreenWidth()), 0.0f };
-			Draw(arrStars[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
-		}
-
 		// Draw bullets shot out
 		if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 		for (auto& bullet : vBullets)
@@ -479,11 +492,11 @@ public:
 			DrawString(CenterTextPosistion(lc.size(), 2), lc, whiteFadeIn, 2U);
 			if (whiteFadeIn.a == 255)
 			{
-				std::string s = "Press Enter to continue...";
+				std::string s = "Press Enter to continue";
 				FadeInPixel(whiteFadeIn2, 100.0f, fElapsedTime);
 				DrawString(CenterTextPosistion(s.size(), 2, { 0.0f, 50.0f }), s, whiteFadeIn2, 2U);
 
-				if (GetKey(olc::ENTER).bPressed) nCurState = STATE::MAIN_SCREEN; // STATE_LEVEL_COMPLETE ?
+				if (GetKey(olc::ENTER).bPressed) { whiteFadeIn2.a = 0; nCurState = STATE::MAIN_SCREEN; } // STATE_LEVEL_COMPLETE ?
 			};
 			
 		}
