@@ -1,139 +1,18 @@
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
+#include "ShootEmUp.h"
 #include <string>
 #include <vector>
 #include <array>
 #include <algorithm>
 
+
 // Todo:
 // - Make a function to fade in a pixel
 //    - Fix all issues that need to use this function
 // - Homing bullets still a little janky
-
-constexpr float PI = 3.14159265359f;
-constexpr float TWO_PI = PI * 2.0f;
-
-// Base struct which most inherit from
-struct Entity
-{
-	olc::vf2d pos;
-	float speed;
-	float angle;
-	void SetAngleToEntity(olc::vf2d& pPos)
-	{
-		this->angle = atan2f(pPos.y - this->pos.y, pPos.x - this->pos.x);
-	}
-};
-
-struct Bullet : public Entity
-{
-	int radius;
-	Bullet(olc::vf2d pos, float speed, float angle, int radius = 2)
-	{
-		this->pos = pos;
-		this->speed = speed;
-		this->angle = angle;
-		this->radius = radius;
-	};
-	Bullet(float x, float y, float speed, float angle, int radius = 2)
-	{
-		this->pos.x = x;
-		this->pos.y = y;
-		this->speed = speed;
-		this->angle = angle;
-		this->radius = radius;
-	};
-};
-
-struct Enemy : public Entity
-{
-	float radius;
-	int healthPoints;
-	bool isHit = false;
-	Enemy(olc::vf2d pos, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
-	{
-		this->pos = pos + offset;
-		this->speed = speed;
-		this->healthPoints = hp;
-		this->radius = 20.0f;
-	};
-	Enemy(float x, float y, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
-	{
-		this->pos.x = x + offset.x;
-		this->pos.y = y + offset.y;
-		this->speed = speed;
-		this->healthPoints = hp;
-		this->radius = 20.0f;
-	};
-	void ReduceHP(int points)
-	{
-		this->healthPoints = (this->healthPoints - points > 0) ? this->healthPoints - points : 0;
-	}
-};
-
-struct Particle : public Entity
-{
-	Particle(olc::vf2d pos)
-	{
-		this->pos = pos;
-		this->speed = rand() % 200 + 30.0f;
-		this->angle = (rand() % 360) * (PI / 180);
-	}
-	Particle(float x, float y)
-	{
-		this->pos.x = x;
-		this->pos.y = y;
-		this->speed = rand() % 200 + 30.0f;
-		this->angle = (rand() % 360) * (PI / 180);
-	}
-};
-
-void DrawStars(olc::PixelGameEngine* pge, std::array<olc::vf2d, 1000>& arr, float elapsedTime, bool update = true)
-{
-	// Drawing stars
-	for (int i = 0; i < arr.size(); i++)
-	{
-		if (update) arr[i].y += ((i < 150) ? 7.0f : (i < 500) ? 8.5f : 10.0f) * elapsedTime;
-		if (update) if (arr[i].y > pge->ScreenHeight()) arr[i] = { (float)(rand() % pge->ScreenWidth()), 0.0f };
-		pge->Draw(arr[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
-	}
-}
-
-olc::Pixel RandColor()
-{
-	return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
-}
-
-void FadeInPixel(olc::Pixel& p, float speed, float elapsedTime)
-{
-	if (p.a == 255) return;
-	if (p.a < 255) p.a += ceil(speed * elapsedTime);
-	else p.a = 255;
-}
-
-bool Between(float n, float min, float max)
-{
-	return (n >= min && n <= max);
-}
-
-void MoveEntity(Entity& e, float elapsedTime)
-{
-	e.pos.x += e.speed * cosf(e.angle) * elapsedTime;
-	e.pos.y += e.speed * sinf(e.angle) * elapsedTime;
-}
-
-// More concise erase remove idiom
-template<class T, typename Lambda>
-bool RemoveLambda(std::vector<T>& v, Lambda&& func)
-{
-	v.erase(std::remove_if(v.begin(), v.end(), func), v.end());
-	return false;
-}
-
-float absmag(olc::vf2d& v1, olc::vf2d& v2)
-{
-	return sqrt((v2.x - v1.x) * (v2.x - v1.x) + (v2.y - v1.y) * (v2.y - v1.y));
-}
+// - Add lists of upgrades
+//    - Homing, Larger shots, more damage, reduced tear delay, piercing, more upgrade options, etc
 
 
 class Rays : public olc::PixelGameEngine
@@ -149,7 +28,7 @@ public:
 	{
 		// Called once at the start, so create things here
 
-		nCurState = STATE::MAIN_SCREEN;
+		nCurState = State::Level_Complete;
 
 		// Populating stars
 		for (auto& s : arrStars)
@@ -158,6 +37,9 @@ public:
 		// Creating and placing enemies initially
 		for (int i = 0; i < 5; i++)
 			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, 2));
+
+		// Populate cards info
+		GenerateRandCards(vpssCards, nCards);
 
 		return true;
 	}
@@ -174,6 +56,11 @@ public:
 		return (olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale) + offset);
 	}
 
+	olc::vf2d CenterTextCard(std::string& s, uint32_t dx, uint32_t cards, uint32_t scale = 1U, olc::vf2d offset = { 0.0f, 0.0f })
+	{
+		return (olc::vf2d(dx + (.5f * ScreenWidth() / cards) - (scale * 4U * s.size()), 1.5f * ScreenHeight()/3 - 4U * scale) + offset);
+	}
+
 	std::array<olc::vf2d, 1000> arrStars;
 
 	// Starting player pos and velocity and other things
@@ -181,6 +68,8 @@ public:
 	olc::vf2d rotPosRight = {};
 	olc::vf2d rotPosLeft = {};
 	olc::vf2d rotPosNose = {};
+
+	std::vector<Upgrade> vUpgrades = {};
 
 	float fVelocity = 0.0f;
 	float fAcceleration = 150.0f;
@@ -204,21 +93,26 @@ public:
 	float fAccumulatedTime = 0.0f;
 	int nSelected = 0;
 
-
+	// Fix these
 	olc::Pixel whiteFadeIn = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
 	olc::Pixel whiteFadeIn2 = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
 
 	// Game states
-	enum class STATE {
-		MAIN_SCREEN, HELP_SCREEN, LEVEL, LEVEL_COMPLETE, PAUSE
+	enum class State 
+	{
+		Main_Screen, 
+		Help_Screen, 
+		Level, 
+		Level_Complete, 
+		Pause
 	} nCurState;
-	STATE nCurState;
+
 	std::vector<std::string> arrMainScreen = 
 	{ 
 		"Shoot 'em UP!", 
-		"Play", 
-		"Help", 
-		"Exit" 
+		"PLAY", 
+		"HELP", 
+		"EXIT" 
 	};
 	std::vector<std::string> arrHelpScreen = 
 	{ 
@@ -229,9 +123,14 @@ public:
 		"G - Toggle Power Up"
 	};
 
-	
 	// Determine closest enemy to bullet
 	olc::vf2d closestEnemyPos = { 0.0f, 0.0f };
+
+	// Card variables
+	int nCards = 2;
+	std::vector<std::pair<std::string, std::string>> vpssCards = {};
+
+
 
 #define DEBUGMODE 1
 	bool OnUserUpdate(float fElapsedTime) override
@@ -239,13 +138,13 @@ public:
 		Clear(olc::BLACK);
 
 		// Update position only if not in Pause state
-		DrawStars(this, arrStars, fElapsedTime, (nCurState != STATE::PAUSE));
+		DrawStars(this, arrStars, fElapsedTime, (nCurState != State::Pause));
 
 
 		// Handling game states
 		switch (nCurState)
 		{
-			case STATE::MAIN_SCREEN:
+			case State::Main_Screen:
 			{
 
 				// This WHOLE THING is a hack !!! edit: IDK i kinda like it
@@ -262,8 +161,8 @@ public:
 				
 				if (GetKey(olc::ENTER).bPressed || GetKey(olc::SPACE).bPressed)
 				{
-					if (nSelected == 0) nCurState = STATE::LEVEL;
-					if (nSelected == 1) nCurState = STATE::HELP_SCREEN;
+					if (nSelected == 0) nCurState = State::Level;
+					if (nSelected == 1) nCurState = State::Help_Screen;
 					if (nSelected == 2) return false; // Exit game
 				}
 
@@ -271,11 +170,12 @@ public:
 				DrawString(vPlayPos, arrMainScreen[1], (nSelected == 0 ? olc::RED : olc::WHITE), 2U);
 				DrawString(vHelpPos, arrMainScreen[2], (nSelected == 1 ? olc::RED : olc::WHITE), 2U);
 				DrawString(vExitPos, arrMainScreen[3], (nSelected == 2 ? olc::RED : olc::WHITE), 2U);
+				
 
 			}
 			break;
 
-			case STATE::HELP_SCREEN:
+			case State::Help_Screen:
 			{
 				float offset = 10.0f;
 				float dy = (float)ScreenHeight() / (float)arrHelpScreen.size();
@@ -286,12 +186,12 @@ public:
 				}
 
 				if (GetKey(olc::SPACE).bPressed || GetKey(olc::ENTER).bPressed || GetKey(olc::ESCAPE).bPressed)
-					nCurState = STATE::MAIN_SCREEN;
+					nCurState = State::Main_Screen;
 
 			}
 			break;
 
-			case STATE::LEVEL:
+			case State::Level:
 			{
 				// Level stuff
 
@@ -300,10 +200,13 @@ public:
 				if (GetKey(olc::C).bPressed) fRotVelocity += 10.0f;
 				if (GetKey(olc::X).bPressed) fRotVelocity -= 10.0f;
 				if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
-				if (GetKey(olc::M).bHeld) vEnemies.push_back(std::make_unique<Enemy>(0.0f, 0.0f, (rand() % 100) + 10, 10));
+				if (GetKey(olc::M).bHeld)
+				{
+					vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
+				}
 			#endif
 
-				if (GetKey(olc::ESCAPE).bPressed) { nCurState = STATE::PAUSE; return true; }
+				if (GetKey(olc::ESCAPE).bPressed) { nCurState = State::Pause; return true; }
 
 				// Speed modifier
 				if (GetKey(olc::SHIFT).bHeld) fMaxVelocity = 250.0f;
@@ -328,7 +231,7 @@ public:
 					if (fVelocity <= -fMaxVelocity / 2.0f) fVelocity += fAcceleration * fElapsedTime; // ... and vice versa when going backwards.
 					else if (fVelocity >= -fMaxVelocity / 2.0f) fVelocity -= fAcceleration * fElapsedTime;
 				}
-
+				
 				// Update player rotation
 				if (fRotVelocity != 0.0f)
 				{
@@ -375,11 +278,12 @@ public:
 						if (fAccumulatedTime >= fShotDelay)
 						{
 							rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
+							vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation, 4));
 
-							if (bPowerUp) {
-								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation + PI / 18));
-								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation - PI / 18));
+							if (bPowerUp) 
+							{
+								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation + PI / 18, 4));
+								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation - PI / 18, 4));
 							}
 
 							fAccumulatedTime = 0.0f;
@@ -404,7 +308,6 @@ public:
 				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 				for (auto& bullet : vBullets)
 				{
-					//if (bHomingShots) bullet->SetAngleToEntity(closestEnemyPos);
 					
 					MoveEntity(*bullet, fElapsedTime);
 					DrawCircle(bullet->pos, bullet->radius);
@@ -417,7 +320,7 @@ public:
 						{
 							bullet->pos.x = ScreenWidth() + 1;
 							bullet->pos.y = ScreenHeight() + 1;
-							enemy->ReduceHP(1);
+							enemy->ReduceHP(bullet->damage);
 							enemy->isHit = true;
 						}
 
@@ -426,7 +329,8 @@ public:
 						if (absmag(enemy->pos, bullet->pos) < absmag(closestEnemyPos, bullet->pos))
 						{
 							closestEnemyPos = enemy->pos;
-							bullet->SetAngleToEntity(enemy->pos);
+							if (abs(atan2f(enemy->pos.y - bullet->pos.y, enemy->pos.x - bullet->pos.x)) < PI/2.0f)
+								bullet->SetAngleToEntity(enemy->pos);
 						}
 					}
 				}
@@ -483,7 +387,12 @@ public:
 						FadeInPixel(whiteFadeIn2, 100.0f, fElapsedTime);
 						DrawString(CenterTextPosistion(s.size(), 2, { 0.0f, 50.0f }), s, whiteFadeIn2, 2U);
 
-						if (GetKey(olc::ENTER).bPressed) { whiteFadeIn2.a = 0; nCurState = STATE::MAIN_SCREEN; } // STATE_LEVEL_COMPLETE ?
+						if (GetKey(olc::ENTER).bPressed) 
+						{ 
+							whiteFadeIn2.a = 0; 
+							GenerateRandCards(vpssCards, nCards);
+							nCurState = State::Level_Complete; 
+						} 
 					};
 
 				}
@@ -506,14 +415,50 @@ public:
 			}
 			break;
 
-			case STATE::LEVEL_COMPLETE:
+			case State::Level_Complete:
 			{
 				// Maybe show something for next level
 				// Possibly level statistics etc
+
+				std::string su = "SELECT UPGRADE", pe = "PRESS ENTER";
+				DrawString(CenterTextPosistion(su.size(), 3U, { 0.0f, (ScreenHeight()/-3.0f) }), su, olc::WHITE, 3U);
+				DrawString(CenterTextPosistion(pe.size(), 3U, { 0.0f, (ScreenHeight() /3.0f) + 8.0f }), pe, olc::WHITE, 3U);
+
+				if (GetKey(olc::A).bPressed) nSelected--;
+				if (GetKey(olc::D).bPressed) nSelected++;
+
+				if (nSelected < 0) nSelected = nCards - 1;
+				if (nSelected > nCards - 1) nSelected = 0;
+
+				if (GetKey(olc::ENTER).bPressed || GetKey(olc::SPACE).bPressed)
+				{
+					std::cout << "Selected: " << vpssCards[nSelected].first << std::endl;
+				}
+
+
+
+				
+				int offset = 0;
+
+				for (int i = 0; i < nCards; i++)
+				{
+					if (i == nSelected) FillRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
+					else DrawRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
+
+					DrawString(CenterTextCard(vpssCards[i].first, offset, nCards, 2U, { 0.0f, -10.0f }), vpssCards[i].first, (i == nSelected) ? olc::BLACK : olc::WHITE, 2U);
+					DrawString(CenterTextCard(vpssCards[i].second, offset, nCards, 1U, { 0.0f, 20.0f }), vpssCards[i].second, (i == nSelected) ? olc::BLACK : olc::WHITE, 1U);
+
+					offset += ScreenWidth()/nCards;
+				}
+
+
+
+
+				if (GetKey(olc::ESCAPE).bPressed) nCurState = State::Main_Screen;
 			}
 			break;
 
-			case STATE::PAUSE:
+			case State::Pause:
 			{
 				// Draw bullets shot out
 				for (auto& bullet : vBullets)
@@ -536,10 +481,10 @@ public:
 				DrawLine(pos, rotPosRight);
 				DrawLine(rotPosRight, rotPosNose);
 
-				std::string ps = "Pause";
+				std::string ps = "PAUSE";
 				DrawString(CenterTextPosistion(ps.size(), 2U), ps, olc::WHITE, 2U);
 
-				if (GetKey(olc::ESCAPE).bPressed) nCurState = STATE::LEVEL;
+				if (GetKey(olc::ESCAPE).bPressed) nCurState = State::Level;
 
 			}
 			break;
