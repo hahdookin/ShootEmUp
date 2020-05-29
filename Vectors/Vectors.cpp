@@ -8,97 +8,76 @@
 // Todo:
 // - Make a function to fade in a pixel
 //    - Fix all issues that need to use this function
-// - Make Help screen sexier
+// - Homing bullets still a little janky
 
 constexpr float PI = 3.14159265359f;
 constexpr float TWO_PI = PI * 2.0f;
 
-constexpr short nMapRows = 12, nMapColumns = 16;
-
-int map[nMapRows][nMapColumns]  = {
-	{0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,1,0,0,0,0,1,1,1,1,0,0},
-	{0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-};
-
-struct Bullet
+// Base struct which most inherit from
+struct Entity
 {
 	olc::vf2d pos;
-	int radius;
-	float shotSpeed;
+	float speed;
 	float angle;
-	Bullet(olc::vf2d pos, float shotSpeed, float angle, int radius = 2)
+	void SetAngleToEntity(olc::vf2d& pPos)
+	{
+		this->angle = atan2f(pPos.y - this->pos.y, pPos.x - this->pos.x);
+	}
+};
+
+struct Bullet : public Entity
+{
+	int radius;
+	Bullet(olc::vf2d pos, float speed, float angle, int radius = 2)
 	{
 		this->pos = pos;
-		this->shotSpeed = shotSpeed;
+		this->speed = speed;
 		this->angle = angle;
 		this->radius = radius;
 	};
-	Bullet(float x, float y, float shotSpeed, float angle, int radius = 2)
+	Bullet(float x, float y, float speed, float angle, int radius = 2)
 	{
 		this->pos.x = x;
 		this->pos.y = y;
-		this->shotSpeed = shotSpeed;
+		this->speed = speed;
 		this->angle = angle;
 		this->radius = radius;
 	};
 };
 
-struct Enemy
+struct Enemy : public Entity
 {
-	olc::vf2d pos;
-	olc::vf2d offset;
-	float speed;
-	float angle;
 	float radius;
 	int healthPoints;
 	bool isHit = false;
 	Enemy(olc::vf2d pos, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
 	{
-		this->pos = pos;
-		this->offset = offset;
+		this->pos = pos + offset;
 		this->speed = speed;
 		this->healthPoints = hp;
 		this->radius = 20.0f;
 	};
 	Enemy(float x, float y, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
 	{
-		this->pos.x = x;
-		this->pos.y = y;
-		this->offset = offset;
+		this->pos.x = x + offset.x;
+		this->pos.y = y + offset.y;
 		this->speed = speed;
 		this->healthPoints = hp;
 		this->radius = 20.0f;
 	};
-	void SetAngleToEntity(olc::vf2d& pPos)
-	{
-		this->angle = atan2f(pPos.y - this->pos.y, pPos.x - this->pos.x);
-	}
 	void ReduceHP(int points)
 	{
 		this->healthPoints = (this->healthPoints - points > 0) ? this->healthPoints - points : 0;
 	}
 };
 
-struct Particle 
+struct Particle : public Entity
 {
-	olc::vf2d pos;
-	float speed;
-	float angle;
 	Particle(olc::vf2d pos)
 	{
 		this->pos = pos;
 		this->speed = rand() % 200 + 30.0f;
-		this->angle = (rand() % 360) * (PI/180);
+		this->angle = (rand() % 360) * (PI / 180);
 	}
 	Particle(float x, float y)
 	{
@@ -119,6 +98,43 @@ void DrawStars(olc::PixelGameEngine* pge, std::array<olc::vf2d, 1000>& arr, floa
 		pge->Draw(arr[i], ((i < 150) ? olc::VERY_DARK_GREY : (i < 500) ? olc::DARK_GREY : olc::WHITE));
 	}
 }
+
+olc::Pixel RandColor()
+{
+	return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
+}
+
+void FadeInPixel(olc::Pixel& p, float speed, float elapsedTime)
+{
+	if (p.a == 255) return;
+	if (p.a < 255) p.a += ceil(speed * elapsedTime);
+	else p.a = 255;
+}
+
+bool Between(float n, float min, float max)
+{
+	return (n >= min && n <= max);
+}
+
+void MoveEntity(Entity& e, float elapsedTime)
+{
+	e.pos.x += e.speed * cosf(e.angle) * elapsedTime;
+	e.pos.y += e.speed * sinf(e.angle) * elapsedTime;
+}
+
+// More concise erase remove idiom
+template<class T, typename Lambda>
+bool RemoveLambda(std::vector<T>& v, Lambda&& func)
+{
+	v.erase(std::remove_if(v.begin(), v.end(), func), v.end());
+	return false;
+}
+
+float absmag(olc::vf2d& v1, olc::vf2d& v2)
+{
+	return sqrt((v2.x - v1.x) * (v2.x - v1.x) + (v2.y - v1.y) * (v2.y - v1.y));
+}
+
 
 class Rays : public olc::PixelGameEngine
 {
@@ -146,23 +162,7 @@ public:
 		return true;
 	}
 
-	// More concise erase remove idiom
-	template<class T, typename Lambda>
-	bool RemoveLambda(std::vector<T>& v, Lambda&& func)
-	{
-		v.erase(std::remove_if(v.begin(), v.end(), func), v.end());
-		return false;
-	}
-
-	olc::Pixel RandColor()
-	{
-		return olc::Pixel(rand() % 256, rand() % 256, rand() % 256);
-	}
-
-	bool Between(float n, float min, float max)
-	{
-		return (n >= min && n <= max);
-	}
+	
 
 	bool IsOffScreen(olc::vf2d& pos)
 	{
@@ -172,13 +172,6 @@ public:
 	olc::vf2d CenterTextPosistion(size_t size, uint32_t scale = 1, olc::vf2d offset = { 0.0f, 0.0f })
 	{
 		return (olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale) + offset);
-	}
-
-	void FadeInPixel(olc::Pixel& p, float speed, float elapsedTime)
-	{
-		if (p.a == 255) return;
-		if (p.a < 255) p.a += ceil(speed * elapsedTime);
-		else p.a = 255;
 	}
 
 	std::array<olc::vf2d, 1000> arrStars;
@@ -207,6 +200,7 @@ public:
 
 	bool bSingleMode = true;
 	bool bPowerUp = false;
+	bool bHomingShots = false;
 	float fAccumulatedTime = 0.0f;
 	int nSelected = 0;
 
@@ -215,10 +209,10 @@ public:
 	olc::Pixel whiteFadeIn2 = olc::PixelF(1.0f, 1.0f, 1.0f, 0.0f);
 
 	// Game states
-	enum STATE {
+	enum class STATE {
 		MAIN_SCREEN, HELP_SCREEN, LEVEL, LEVEL_COMPLETE, PAUSE
 	} nCurState;
-
+	STATE nCurState;
 	std::vector<std::string> arrMainScreen = 
 	{ 
 		"Shoot 'em UP!", 
@@ -235,6 +229,10 @@ public:
 		"G - Toggle Power Up"
 	};
 
+	
+	// Determine closest enemy to bullet
+	olc::vf2d closestEnemyPos = { 0.0f, 0.0f };
+
 #define DEBUGMODE 1
 	bool OnUserUpdate(float fElapsedTime) override
 	{
@@ -243,7 +241,6 @@ public:
 		// Update position only if not in Pause state
 		DrawStars(this, arrStars, fElapsedTime, (nCurState != STATE::PAUSE));
 
-		//for (size_t y = 0; y < nMapRos)
 
 		// Handling game states
 		switch (nCurState)
@@ -313,8 +310,6 @@ public:
 				else fMaxVelocity = 150.0f;
 
 				// Rotation and movement Keys
-				//if (GetKey(olc::A).bHeld) fRotation -= fRotVelocity * fElapsedTime;
-				//if (GetKey(olc::D).bHeld) fRotation += fRotVelocity * fElapsedTime;
 				if (GetKey(olc::A).bHeld)
 				{
 					if (fRotVelocity >= -fRotMaxVelocity) fRotVelocity -= fRotAcceleration * fElapsedTime;
@@ -363,6 +358,7 @@ public:
 				// Shoot bullets
 				if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
 				if (GetKey(olc::G).bPressed) bPowerUp = !bPowerUp;
+				if (GetKey(olc::K).bPressed) bHomingShots = !bHomingShots;
 				if (bSingleMode)
 				{
 					if (GetKey(olc::SPACE).bPressed)
@@ -380,10 +376,12 @@ public:
 						{
 							rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
 							vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
+
 							if (bPowerUp) {
 								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation + PI / 18));
 								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation - PI / 18));
 							}
+
 							fAccumulatedTime = 0.0f;
 						}
 
@@ -400,13 +398,15 @@ public:
 				if (pos.y >= ScreenHeight()) pos.y = ScreenHeight();
 				if (pos.y <= 0) pos.y = 0;
 
+				
 
 				// Draw bullets shot out also update position
 				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 				for (auto& bullet : vBullets)
 				{
-					bullet->pos.x += bullet->shotSpeed * cosf(bullet->angle) * fElapsedTime;
-					bullet->pos.y += bullet->shotSpeed * sinf(bullet->angle) * fElapsedTime;
+					//if (bHomingShots) bullet->SetAngleToEntity(closestEnemyPos);
+					
+					MoveEntity(*bullet, fElapsedTime);
 					DrawCircle(bullet->pos, bullet->radius);
 
 					// Check if bullet has come into contact with an enemy
@@ -420,6 +420,14 @@ public:
 							enemy->ReduceHP(1);
 							enemy->isHit = true;
 						}
+
+						// Determine closest enemy to home in to
+						if (!bHomingShots) continue;
+						if (absmag(enemy->pos, bullet->pos) < absmag(closestEnemyPos, bullet->pos))
+						{
+							closestEnemyPos = enemy->pos;
+							bullet->SetAngleToEntity(enemy->pos);
+						}
 					}
 				}
 
@@ -430,13 +438,12 @@ public:
 					{
 						// Explosion
 						for (int i = 0; i < 100; i++) // 1000 paricles o.O
-							vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
+							vParticles.push_back(std::make_unique<Particle>(enemy->pos));
 						continue;
 					}
 
 					enemy->SetAngleToEntity(pos);
-					enemy->pos.x += enemy->speed * cosf(enemy->angle) * fElapsedTime;
-					enemy->pos.y += enemy->speed * sinf(enemy->angle) * fElapsedTime;
+					MoveEntity(*enemy, fElapsedTime);
 					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : olc::RED));
 					DrawCircle(enemy->pos, enemy->radius, RandColor());
 					if (enemy->isHit) for (int i = 0; i < 10; i++) vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
@@ -448,8 +455,7 @@ public:
 				if (vParticles.size() > 0) RemoveLambda(vParticles, [this](std::unique_ptr<Particle>& p) { return IsOffScreen(p->pos); });
 				for (auto& p : vParticles)
 				{
-					p->pos.x += p->speed * cosf(p->angle) * fElapsedTime;
-					p->pos.y += p->speed * sinf(p->angle) * fElapsedTime;
+					MoveEntity(*p, fElapsedTime);
 					Draw(p->pos);
 				}
 
