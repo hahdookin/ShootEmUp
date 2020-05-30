@@ -127,7 +127,8 @@ public:
 	olc::vf2d closestEnemyPos = { 0.0f, 0.0f };
 
 	// Card variables
-	int nCards = 2;
+	uint32_t nCards = 2;
+	int nCardSelected = 0;
 	std::vector<std::pair<std::string, std::string>> vpssCards = {};
 
 
@@ -203,6 +204,7 @@ public:
 				if (GetKey(olc::M).bHeld)
 				{
 					vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
+					vEnemies.push_back(std::make_unique<ShootingEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), 10, 10));
 				}
 			#endif
 
@@ -348,7 +350,7 @@ public:
 
 					enemy->SetAngleToEntity(pos);
 					MoveEntity(*enemy, fElapsedTime);
-					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : olc::RED));
+					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : enemy->color));
 					DrawCircle(enemy->pos, enemy->radius, RandColor());
 					if (enemy->isHit) for (int i = 0; i < 10; i++) vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
 					if (enemy->isHit) enemy->isHit = false;
@@ -424,37 +426,49 @@ public:
 				DrawString(CenterTextPosistion(su.size(), 3U, { 0.0f, (ScreenHeight()/-3.0f) }), su, olc::WHITE, 3U);
 				DrawString(CenterTextPosistion(pe.size(), 3U, { 0.0f, (ScreenHeight() /3.0f) + 8.0f }), pe, olc::WHITE, 3U);
 
-				if (GetKey(olc::A).bPressed) nSelected--;
-				if (GetKey(olc::D).bPressed) nSelected++;
+				if (GetKey(olc::A).bPressed) nCardSelected--;
+				if (GetKey(olc::D).bPressed) nCardSelected++;
 
-				if (nSelected < 0) nSelected = nCards - 1;
-				if (nSelected > nCards - 1) nSelected = 0;
-
-				if (GetKey(olc::ENTER).bPressed || GetKey(olc::SPACE).bPressed)
-				{
-					std::cout << "Selected: " << vpssCards[nSelected].first << std::endl;
-				}
-
-
+				// Scroll through options in a looping fashion
+				if (nCardSelected < 0) nCardSelected = nCards - 1;
+				if (nCardSelected > nCards - 1) nCardSelected = 0;
 
 				
-				int offset = 0;
-
+				// Drawing cards on the screen
+				float offset = 0;
+				uint32_t scale = (nCards < 4) ? 2U : 1U;
 				for (int i = 0; i < nCards; i++)
 				{
-					if (i == nSelected) FillRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
+					if (i == nCardSelected) FillRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
 					else DrawRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
 
-					DrawString(CenterTextCard(vpssCards[i].first, offset, nCards, 2U, { 0.0f, -10.0f }), vpssCards[i].first, (i == nSelected) ? olc::BLACK : olc::WHITE, 2U);
-					DrawString(CenterTextCard(vpssCards[i].second, offset, nCards, 1U, { 0.0f, 20.0f }), vpssCards[i].second, (i == nSelected) ? olc::BLACK : olc::WHITE, 1U);
+					// Upgrade name (quite wordy function calls here)
+					DrawString(
+						CenterTextCard(vpssCards[i].first, offset, nCards, scale, { 0.0f, -10.0f }),
+						vpssCards[i].first, 
+						(i == nCardSelected) ? olc::BLACK : olc::WHITE,
+						scale
+					);
+
+					// Upgrade desc
+					DrawString(
+						CenterTextCard(vpssCards[i].second, offset, nCards, 1U, { 0.0f, 20.0f }),
+						vpssCards[i].second, 
+						(i == nCardSelected) ? olc::BLACK : olc::WHITE,
+						1U
+					);
 
 					offset += ScreenWidth()/nCards;
 				}
 
 
+				if (GetKey(olc::ENTER).bPressed)
+				{
+					if (vpssCards[nCardSelected].first == "Extra Card" && nCards < (int)Upgrade::Total_Upgrades) nCards++;
+					std::cout << "Selected: " << vpssCards[nCardSelected].first << std::endl;
 
-
-				if (GetKey(olc::ESCAPE).bPressed) nCurState = State::Main_Screen;
+					nCurState = State::Main_Screen;
+				}
 			}
 			break;
 

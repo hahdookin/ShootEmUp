@@ -8,18 +8,25 @@ constexpr float TWO_PI = PI * 2.0f;
 struct Entity;
 struct Bullet;
 struct Enemy;
+struct ShootingEnemy;
+struct BruteEnemy;
 struct Particle;
 
 enum class Upgrade
 {
 	Double_Shot,
 	Triple_Shot,
+	Quad_Shot,
 	Homing_Shot,
+	Piercing_Shot,
+	Shrink_Shot,
 	Decrease_Shot_Delay,
 	Increase_Shot_Size,
 	More_Options,
 	Increase_Speed,
 	Increase_Mod_Speed,
+	Incrase_Size, 
+	Decrease_Size,
 	Total_Upgrades
 } nUpgrade;
 
@@ -54,22 +61,20 @@ struct Bullet : public Entity
 {
 	int radius;
 	int damage;
+
 	Bullet(olc::vf2d pos, float speed, float angle, int radius = 2, int damage = 1)
-	{
-		this->pos = pos;
-		this->speed = speed;
-		this->angle = angle;
-		this->radius = radius;
-		this->damage = damage;
-	};
-	Bullet(float x, float y, float speed, float angle, int radius = 2)
+		: Bullet(pos.x, pos.y, speed, angle, radius, damage) {};
+
+	Bullet(float x, float y, float speed, float angle, int radius = 2, int damage = 1)
 	{
 		this->pos.x = x;
 		this->pos.y = y;
 		this->speed = speed;
 		this->angle = angle;
 		this->radius = radius;
+		this->damage = damage;
 	};
+	
 };
 
 struct Enemy : public Entity
@@ -77,13 +82,11 @@ struct Enemy : public Entity
 	float radius;
 	int healthPoints;
 	bool isHit = false;
+	olc::Pixel color;
+
 	Enemy(olc::vf2d pos, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
-	{
-		this->pos = pos + offset;
-		this->speed = speed;
-		this->healthPoints = hp;
-		this->radius = 20.0f;
-	};
+		: Enemy(pos.x, pos.y, speed, hp, offset) {};
+
 	Enemy(float x, float y, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f })
 	{
 		this->pos.x = x + offset.x;
@@ -96,6 +99,21 @@ struct Enemy : public Entity
 	{
 		this->healthPoints = (this->healthPoints - points > 0) ? this->healthPoints - points : 0;
 	}
+};
+
+struct ShootingEnemy : public Enemy
+{
+	using Enemy::Enemy;
+	olc::Pixel color = olc::DARK_GREEN;
+	bool WillFire()
+	{
+		return rand() % 500 == 1;
+	}
+};
+
+struct BruteEnemy : public Enemy
+{
+
 };
 
 struct Particle : public Entity
@@ -179,10 +197,18 @@ std::array<std::pair<std::string, std::string>, (size_t)(Upgrade::Total_Upgrades
 {
 	std::make_pair("Double Shot", "Twice the fun"),
 	std::make_pair("Triple Shot", "More guns!"),
+	std::make_pair("Quad Shot", "Lil' overkill"),
 	std::make_pair("Homing Shot", "Find your path"),
+	std::make_pair("UV Shot", "Piercing shots"),
+	std::make_pair("Shrink Ray", "Make em' Small!"),
 	std::make_pair("Extra Crew", "Fire rate UP"),
 	std::make_pair("Cannonballs", "Bigger shot size"),
-	std::make_pair("Extra Card", "More options!")
+	std::make_pair("Extra Card", "More options!"),
+	std::make_pair("Carbon Fins", "Fly faster!"),
+	std::make_pair("FTL Thrusters", "Boost faster!"),
+	std::make_pair("Renovate", "Bigger ship!"),
+	std::make_pair("Keto Diet", "Weight loss!")
+	
 };
 
 void GenerateRandCards(std::vector<std::pair<std::string, std::string>>& vCards, int nCards)
@@ -194,14 +220,5 @@ void GenerateRandCards(std::vector<std::pair<std::string, std::string>>& vCards,
 	}
 }
 
-/*enum class Upgrade
-{
-	Double_Shot,
-	Triple_Shot,
-	Homing_Shot,
-	Decrease_Shot_Delay,
-	Increase_Shot_Size,
-	More_Options,
-	Total_Upgrades
-} nUpgrade;*/
+
 
