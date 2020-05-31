@@ -1,4 +1,4 @@
-#define OLC_PGE_APPLICATION
+//#define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
 #include "ShootEmUp.h"
 #include <string>
@@ -13,6 +13,9 @@
 // - Homing bullets still a little janky
 // - Add lists of upgrades
 //    - Homing, Larger shots, more damage, reduced tear delay, piercing, more upgrade options, etc
+// - Test emplace_back vs push_back for vector containers
+//    - Override copy constructor and count copies made
+// - Make better way of tracking upgrades
 
 
 class Rays : public olc::PixelGameEngine
@@ -36,7 +39,7 @@ public:
 
 		// Creating and placing enemies initially
 		for (int i = 0; i < 5; i++)
-			vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, 2));
+			vEnemies.push_back(std::make_unique<BruteEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), (rand() % 20) + 10.0f, 2));
 
 		// Populate cards info
 		GenerateRandCards(vpssCards, nCards);
@@ -51,12 +54,12 @@ public:
 		return (pos.x > ScreenWidth() || pos.x < 0 || pos.y > ScreenHeight() || pos.y < 0);
 	}
 
-	olc::vf2d CenterTextPosistion(size_t size, uint32_t scale = 1, olc::vf2d offset = { 0.0f, 0.0f })
+	olc::vf2d CenterTextPosistion(const std::string& s, uint32_t scale = 1, olc::vf2d offset = { 0.0f, 0.0f })
 	{
-		return (olc::vf2d((ScreenWidth() / 2.0f) - (size * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale) + offset);
+		return (olc::vf2d((ScreenWidth() / 2.0f) - (s.size() * 8 * scale) / 2.0f, (ScreenHeight() / 2.0f) - 8.0f * scale) + offset);
 	}
 
-	olc::vf2d CenterTextCard(std::string& s, uint32_t dx, uint32_t cards, uint32_t scale = 1U, olc::vf2d offset = { 0.0f, 0.0f })
+	olc::vf2d CenterTextCard(const std::string& s, const uint32_t& dx, uint32_t cards, uint32_t scale = 1U, olc::vf2d offset = { 0.0f, 0.0f })
 	{
 		return (olc::vf2d(dx + (.5f * ScreenWidth() / cards) - (scale * 4U * s.size()), 1.5f * ScreenHeight()/3 - 4U * scale) + offset);
 	}
@@ -81,11 +84,13 @@ public:
 	float fRotMaxVelocity = 7.0f;
 
 	float lineRay = 15.0f; // Magnitude of triangle edges
-	float fShotDelay = 0.1f;
+	float fShotDelay = 0.3f;
+	float fShotSpeed = 300.0f;
 
 	std::vector<std::unique_ptr<Bullet>> vBullets = {};
 	std::vector<std::unique_ptr<Enemy>> vEnemies = {};
 	std::vector<std::unique_ptr<Particle>> vParticles = {};
+	std::vector<std::unique_ptr<Bullet>> vEnemyBullets = {};
 
 	bool bSingleMode = true;
 	bool bPowerUp = false;
@@ -131,9 +136,11 @@ public:
 	int nCardSelected = 0;
 	std::vector<std::pair<std::string, std::string>> vpssCards = {};
 
-
+	// Our beloved Player
+	Player player = Player((float)(ScreenWidth()/2), (float)(ScreenHeight()/2));
 
 #define DEBUGMODE 1
+
 	bool OnUserUpdate(float fElapsedTime) override
 	{
 		Clear(olc::BLACK);
@@ -149,10 +156,10 @@ public:
 			{
 
 				// This WHOLE THING is a hack !!! edit: IDK i kinda like it
-				olc::vf2d vTitlePos = CenterTextPosistion(arrMainScreen[0].size(), 3U, { 0.0f, -75.0f });
-				olc::vf2d vPlayPos = CenterTextPosistion(arrMainScreen[1].size(), 2U, { 0.0f, 0.0f });
-				olc::vf2d vHelpPos = CenterTextPosistion(arrMainScreen[2].size(), 2U, { 0.0f, 50.0f });
-				olc::vf2d vExitPos = CenterTextPosistion(arrMainScreen[3].size(), 2U, { 0.0f, 100.0f });
+				olc::vf2d vTitlePos = CenterTextPosistion(arrMainScreen[0], 3U, { 0.0f, -75.0f });
+				olc::vf2d vPlayPos = CenterTextPosistion(arrMainScreen[1], 2U, { 0.0f, 0.0f });
+				olc::vf2d vHelpPos = CenterTextPosistion(arrMainScreen[2], 2U, { 0.0f, 50.0f });
+				olc::vf2d vExitPos = CenterTextPosistion(arrMainScreen[3], 2U, { 0.0f, 100.0f });
 
 				if (GetKey(olc::W).bPressed) nSelected--;
 				if (GetKey(olc::S).bPressed) nSelected++;
@@ -203,7 +210,7 @@ public:
 				if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
 				if (GetKey(olc::M).bHeld)
 				{
-					vEnemies.push_back(std::make_unique<Enemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
+					vEnemies.push_back(std::make_unique<BruteEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
 					vEnemies.push_back(std::make_unique<ShootingEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), 10, 10));
 				}
 			#endif
@@ -264,34 +271,29 @@ public:
 				if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
 				if (GetKey(olc::G).bPressed) bPowerUp = !bPowerUp;
 				if (GetKey(olc::K).bPressed) bHomingShots = !bHomingShots;
-				if (bSingleMode)
+				if (GetKey(olc::SPACE).bHeld)
 				{
-					if (GetKey(olc::SPACE).bPressed)
+					fAccumulatedTime += fElapsedTime;
+					if (fAccumulatedTime >= fShotDelay)
 					{
 						rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation));
-					}
-				}
-				else
-				{
-					if (GetKey(olc::SPACE).bHeld)
-					{
-						fAccumulatedTime += fElapsedTime;
-						if (fAccumulatedTime >= fShotDelay)
+
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, fShotSpeed, fRotation, 4));
+
+						// Double Shot Upgrade
+						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation - PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation - PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
+						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation + PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation + PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
+
+						// Triple Shot
+						if (bPowerUp)
 						{
-							rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, 300.0f, fRotation, 4));
-
-							if (bPowerUp) 
-							{
-								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation + PI / 18, 4));
-								vBullets.push_back(std::make_unique<Bullet>(rotPosNose, 300.0f, fRotation - PI / 18, 4));
-							}
-
-							fAccumulatedTime = 0.0f;
+							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation + PI / 18, 4));
+							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation - PI / 18, 4));
 						}
 
+						fAccumulatedTime = 0.0f;
 					}
+
 				}
 
 				// Keep rotation within 2 PI
@@ -304,7 +306,15 @@ public:
 				if (pos.y >= ScreenHeight()) pos.y = ScreenHeight();
 				if (pos.y <= 0) pos.y = 0;
 
-				
+				// Draw and update enemy bullets
+				if (vEnemyBullets.size() > 0) RemoveLambda(vEnemyBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
+				for (auto& bullet : vEnemyBullets)
+				{
+					MoveEntity(*bullet, fElapsedTime);
+					DrawCircle(bullet->pos, bullet->radius, olc::RED);
+
+					// Check if bullet has hit player
+				}
 
 				// Draw bullets shot out also update position
 				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
@@ -352,8 +362,20 @@ public:
 					MoveEntity(*enemy, fElapsedTime);
 					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : enemy->color));
 					DrawCircle(enemy->pos, enemy->radius, RandColor());
-					if (enemy->isHit) for (int i = 0; i < 10; i++) vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
-					if (enemy->isHit) enemy->isHit = false;
+
+					if (enemy->WillFire())
+					{
+						//float angle = atan2f(pos.y - enemy->pos.y, pos.x - enemy->pos.x);
+						float angle = enemy->GetAngleToEntity(pos);
+						vEnemyBullets.push_back(std::make_unique<Bullet>(enemy->pos, 100.0f, angle));
+					}
+
+					if (enemy->isHit) 
+					{
+						for (int i = 0; i < 10; i++)
+							vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
+						enemy->isHit = false;
+					}
 				}
 				if (vEnemies.size() > 0) RemoveLambda(vEnemies, [](std::unique_ptr<Enemy>& e) { return e->healthPoints == 0; }); // Has to come after because drawing explosion
 
@@ -382,12 +404,12 @@ public:
 					// Fade in 'Level Complete' text
 					std::string lc = "Level Complete";
 					FadeInPixel(whiteFadeIn, 100.0f, fElapsedTime);
-					DrawString(CenterTextPosistion(lc.size(), 2), lc, whiteFadeIn, 2U);
+					DrawString(CenterTextPosistion(lc, 2), lc, whiteFadeIn, 2U);
 					if (whiteFadeIn.a == 255)
 					{
 						std::string s = "Press Enter to continue";
 						FadeInPixel(whiteFadeIn2, 100.0f, fElapsedTime);
-						DrawString(CenterTextPosistion(s.size(), 2, { 0.0f, 50.0f }), s, whiteFadeIn2, 2U);
+						DrawString(CenterTextPosistion(s, 2, { 0.0f, 50.0f }), s, whiteFadeIn2, 2U);
 
 						if (GetKey(olc::ENTER).bPressed) 
 						{ 
@@ -423,8 +445,8 @@ public:
 				// Possibly level statistics etc
 
 				std::string su = "SELECT UPGRADE", pe = "PRESS ENTER";
-				DrawString(CenterTextPosistion(su.size(), 3U, { 0.0f, (ScreenHeight()/-3.0f) }), su, olc::WHITE, 3U);
-				DrawString(CenterTextPosistion(pe.size(), 3U, { 0.0f, (ScreenHeight() /3.0f) + 8.0f }), pe, olc::WHITE, 3U);
+				DrawString(CenterTextPosistion(su, 3U, { 0.0f, (ScreenHeight()/-3.0f) }), su, olc::WHITE, 3U);
+				DrawString(CenterTextPosistion(pe, 3U, { 0.0f, (ScreenHeight() /3.0f) + 8.0f }), pe, olc::WHITE, 3U);
 
 				if (GetKey(olc::A).bPressed) nCardSelected--;
 				if (GetKey(olc::D).bPressed) nCardSelected++;
@@ -478,10 +500,14 @@ public:
 				for (auto& bullet : vBullets)
 					DrawCircle(bullet->pos, bullet->radius);
 
+				// Draw enemy bullets
+				for (auto& bullet : vEnemyBullets)
+					DrawCircle(bullet->pos, bullet->radius, olc::RED);
+
 				// Draw enemies on screen
 				for (auto& enemy : vEnemies)
 				{
-					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : olc::RED));
+					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : enemy->color));
 					DrawCircle(enemy->pos, enemy->radius, RandColor());
 				}
 
@@ -496,7 +522,7 @@ public:
 				DrawLine(rotPosRight, rotPosNose);
 
 				std::string ps = "PAUSE";
-				DrawString(CenterTextPosistion(ps.size(), 2U), ps, olc::WHITE, 2U);
+				DrawString(CenterTextPosistion(ps, 2U), ps, olc::WHITE, 2U);
 
 				if (GetKey(olc::ESCAPE).bPressed) nCurState = State::Level;
 
