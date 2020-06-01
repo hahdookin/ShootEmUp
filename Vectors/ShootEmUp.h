@@ -55,6 +55,7 @@ public:
 	Player(olc::vf2d pos);
 	Player(float x, float y);
 
+	void Move(float elapsedTime);
 	void UpdateRotPositions();
 	void DrawShip(olc::PixelGameEngine* pge);
 
@@ -62,8 +63,19 @@ public:
 	void SetPos(olc::vf2d pos);
 	void SetPos(float x, float y);
 
+	float GetPosX();
+	float GetPosY();
+
+	void SetPosX(float x);
+	void SetPosY(float y);
+
+	olc::vf2d GetPosNose();
+
 	float GetVelocity();
 	void SetVelocity(float velocity);
+
+	float GetMaxVelocity();
+	void SetMaxVelocity(float velocity);
 
 	float GetAcceleration();
 	void SetAcceleration(float acceleration);
@@ -97,8 +109,10 @@ struct Entity
 	olc::vf2d pos;
 	float speed;
 	float angle;
+
 	float GetAngleToEntity(const olc::vf2d& entityPos);
 	virtual void SetAngleToEntity(const olc::vf2d& entityPos);
+	void Move(float elapsedTime);
 };
 struct Bullet : Entity
 {
@@ -107,6 +121,7 @@ struct Bullet : Entity
 
 	Bullet(olc::vf2d pos, float speed, float angle, int radius = 2, int damage = 1);
 	Bullet(float x, float y, float speed, float angle, int radius = 2, int damage = 1);
+	void DrawYourself(olc::PixelGameEngine* pge, bool friendly);
 };
 struct Enemy : Entity
 {
@@ -117,6 +132,7 @@ struct Enemy : Entity
 
 	void ReduceHP(int points);
 	virtual bool WillFire();
+	void DrawYourself(olc::PixelGameEngine* pge);
 };
 struct ShootingEnemy : Enemy
 {
@@ -131,11 +147,13 @@ struct BruteEnemy : Enemy
 
 	BruteEnemy(float x, float y, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f });
 };
+
 struct Particle : Entity
 {
 	Particle(olc::vf2d pos);
 
 	Particle(float x, float y);
+	void DrawYourself(olc::PixelGameEngine* pge);
 };
 
 

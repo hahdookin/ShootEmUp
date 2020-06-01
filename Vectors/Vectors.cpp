@@ -66,26 +66,26 @@ public:
 
 	std::array<olc::vf2d, 1000> arrStars;
 
-	// Starting player pos and velocity and other things
-	olc::vf2d pos = { ScreenWidth() / 2, ScreenHeight() / 2 };
-	olc::vf2d rotPosRight = {};
-	olc::vf2d rotPosLeft = {};
-	olc::vf2d rotPosNose = {};
+	//// Starting player pos and velocity and other things
+	//olc::vf2d pos = { ScreenWidth() / 2, ScreenHeight() / 2 };
+	//olc::vf2d rotPosRight = {};
+	//olc::vf2d rotPosLeft = {};
+	//olc::vf2d rotPosNose = {};
 
-	std::vector<Upgrade> vUpgrades = {};
+	//std::vector<Upgrade> vUpgrades = {};
 
-	float fVelocity = 0.0f;
-	float fAcceleration = 150.0f;
-	float fMaxVelocity = 150.0f;
+	//float fVelocity = 0.0f;
+	//float fAcceleration = 150.0f;
+	//float fMaxVelocity = 150.0f;
 
-	float fRotation = 0.0f;
-	float fRotAcceleration = 45.0f;
-	float fRotVelocity = 0.0f;
-	float fRotMaxVelocity = 7.0f;
+	//float fRotation = 0.0f;
+	//float fRotAcceleration = 45.0f;
+	//float fRotVelocity = 0.0f;
+	//float fRotMaxVelocity = 7.0f;
 
-	float lineRay = 15.0f; // Magnitude of triangle edges
-	float fShotDelay = 0.3f;
-	float fShotSpeed = 300.0f;
+	//float lineRay = 15.0f; // Magnitude of triangle edges
+	//float fShotDelay = 0.3f;
+	//float fShotSpeed = 300.0f;
 
 	std::vector<std::unique_ptr<Bullet>> vBullets = {};
 	std::vector<std::unique_ptr<Enemy>> vEnemies = {};
@@ -203,69 +203,98 @@ public:
 			{
 				// Level stuff
 
-			#if DEBUGMODE
-				if (GetKey(olc::V).bPressed) fAcceleration += 10.0f;
-				if (GetKey(olc::C).bPressed) fRotVelocity += 10.0f;
-				if (GetKey(olc::X).bPressed) fRotVelocity -= 10.0f;
-				if (GetKey(olc::N).bPressed) fShotDelay /= 2.0f;
+#if DEBUGMODE
+				if (GetKey(olc::C).bPressed)
+				{
+					//fRotVelocity += 10.0f;
+					player.SetRotVelocity(player.GetRotVelocity() + 10.0f);
+				}
+				if (GetKey(olc::X).bPressed)
+				{
+					//fRotVelocity -= 10.0f;
+					player.SetRotVelocity(player.GetRotVelocity() - 10.0f);
+				}
+				if (GetKey(olc::N).bPressed)
+				{
+					//fShotDelay /= 2.0f;
+					player.SetShotDelay(player.GetShotDelay() / 2);
+				}
 				if (GetKey(olc::M).bHeld)
 				{
 					vEnemies.push_back(std::make_unique<BruteEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
 					vEnemies.push_back(std::make_unique<ShootingEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), 10, 10));
 				}
-			#endif
+#endif
 
 				if (GetKey(olc::ESCAPE).bPressed) { nCurState = State::Pause; return true; }
 
 				// Speed modifier
-				if (GetKey(olc::SHIFT).bHeld) fMaxVelocity = 250.0f;
-				else fMaxVelocity = 150.0f;
+				if (GetKey(olc::SHIFT).bHeld) /*fMaxVelocity = 250.0f;*/ player.SetMaxVelocity(250.0f);
+				else /*fMaxVelocity = 150.0f;*/ player.SetMaxVelocity(150.0f);
 
 				// Rotation and movement Keys
 				if (GetKey(olc::A).bHeld)
 				{
-					if (fRotVelocity >= -fRotMaxVelocity) fRotVelocity -= fRotAcceleration * fElapsedTime;
+					//if (fRotVelocity >= -fRotMaxVelocity) fRotVelocity -= fRotAcceleration * fElapsedTime;
+					if (player.GetRotVelocity() >= -player.GetRotMaxVelocity())
+						player.SetRotVelocity(player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime);
 				}
 				if (GetKey(olc::D).bHeld)
 				{
-					if (fRotVelocity <= fRotMaxVelocity) fRotVelocity += fRotAcceleration * fElapsedTime;
+					//if (fRotVelocity <= fRotMaxVelocity) fRotVelocity += fRotAcceleration * fElapsedTime;
+					if (player.GetRotVelocity() <= player.GetRotMaxVelocity())
+						player.SetRotVelocity(player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime);
 				}
 				if (GetKey(olc::W).bHeld)
 				{
-					if (fVelocity >= fMaxVelocity) fVelocity -= fAcceleration * fElapsedTime; // Decrease smoothly after speed mod
-					else if (fVelocity <= fMaxVelocity) fVelocity += fAcceleration * fElapsedTime; // Increase velocity by acceleration
+					//if (fVelocity >= fMaxVelocity) fVelocity -= fAcceleration * fElapsedTime; // Decrease smoothly after speed mod
+					//else if (fVelocity <= fMaxVelocity) fVelocity += fAcceleration * fElapsedTime; // Increase velocity by acceleration
+					if (player.GetVelocity() >= player.GetMaxVelocity())
+						player.SetVelocity(player.GetVelocity() - player.GetAcceleration() * fElapsedTime);
+					else if (player.GetVelocity() <= player.GetMaxVelocity())
+						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime);
 				}
 				if (GetKey(olc::S).bHeld)
 				{
-					if (fVelocity <= -fMaxVelocity / 2.0f) fVelocity += fAcceleration * fElapsedTime; // ... and vice versa when going backwards.
-					else if (fVelocity >= -fMaxVelocity / 2.0f) fVelocity -= fAcceleration * fElapsedTime;
+					//if (fVelocity <= -fMaxVelocity / 2.0f) fVelocity += fAcceleration * fElapsedTime; // ... and vice versa when going backwards.
+					//else if (fVelocity >= -fMaxVelocity / 2.0f) fVelocity -= fAcceleration * fElapsedTime;
+					if (player.GetVelocity() <= -player.GetMaxVelocity() / 2.0f)
+						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime);
+					else if (player.GetVelocity() >= -player.GetMaxVelocity() / 2.0f)
+						player.SetVelocity(player.GetVelocity() - player.GetAcceleration() * fElapsedTime);
 				}
 				
 				// Update player rotation
-				if (fRotVelocity != 0.0f)
+				if (player.GetRotVelocity() != 0.0f)//if (fRotVelocity != 0.0f)
 				{
-					fRotation += fRotVelocity * fElapsedTime;
+					//fRotation += fRotVelocity * fElapsedTime;
+					player.SetRotation(player.GetRotation() + player.GetRotVelocity() * fElapsedTime);
 				}
 
 				// Move player
-				if (fVelocity != 0.0f)
+				if (player.GetVelocity() != 0.0f)//if (fVelocity != 0.0f)
 				{
-					pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
-					pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
+					//pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
+					//pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
+					player.Move(fElapsedTime);
 				}
 
 				// Start decellerating
-				if (!GetKey(olc::W).bHeld && fVelocity > 0)
-					fVelocity = (fVelocity - fAcceleration * fElapsedTime > 0) ? fVelocity - fAcceleration * fElapsedTime : 0.0f;
+				if (!GetKey(olc::W).bHeld && /*fVelocity > 0*/ player.GetVelocity() > 0.0f)
+					player.SetVelocity((player.GetVelocity() - player.GetAcceleration() * fElapsedTime > 0) ? player.GetVelocity() - player.GetAcceleration() * fElapsedTime : 0.0f);
+					//fVelocity = (fVelocity - fAcceleration * fElapsedTime > 0) ? fVelocity - fAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::S).bHeld && fVelocity < 0)
-					fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
+				if (!GetKey(olc::S).bHeld && /*fVelocity < 0*/ player.GetVelocity() < 0.0f)
+					player.SetVelocity((player.GetVelocity() + player.GetAcceleration() * fElapsedTime < 0) ? player.GetVelocity() + player.GetAcceleration() * fElapsedTime : 0.0f);
+					//fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::A).bHeld && fRotVelocity < 0)
-					fRotVelocity = (fRotVelocity + fRotAcceleration * fElapsedTime < 0) ? fRotVelocity + fRotAcceleration * fElapsedTime : 0.0f;
+				if (!GetKey(olc::A).bHeld && /*fRotVelocity < 0*/ player.GetRotVelocity() < 0.0f)
+					player.SetRotVelocity((player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime < 0) ? player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime : 0.0f);
+					//fRotVelocity = (fRotVelocity + fRotAcceleration * fElapsedTime < 0) ? fRotVelocity + fRotAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::D).bHeld && fRotVelocity > 0)
-					fRotVelocity = (fRotVelocity - fRotAcceleration * fElapsedTime > 0) ? fRotVelocity - fRotAcceleration * fElapsedTime : 0.0f;
+				if (!GetKey(olc::D).bHeld && /*fRotVelocity > 0*/ player.GetRotVelocity() > 0.0f)
+					player.SetRotVelocity((player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime > 0) ? player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime : 0.0f);
+					//fRotVelocity = (fRotVelocity - fRotAcceleration * fElapsedTime > 0) ? fRotVelocity - fRotAcceleration * fElapsedTime : 0.0f;
 
 				// Shoot bullets
 				if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
@@ -274,21 +303,22 @@ public:
 				if (GetKey(olc::SPACE).bHeld)
 				{
 					fAccumulatedTime += fElapsedTime;
-					if (fAccumulatedTime >= fShotDelay)
+					if (fAccumulatedTime >= /*fShotDelay*/ player.GetShotDelay())
 					{
-						rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
-
+						//rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
+						olc::vf2d rotPosNose = player.GetPosNose();
 						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, fShotSpeed, fRotation, 4));
+						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
 
 						// Double Shot Upgrade
-						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation - PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation - PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
-						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation + PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation + PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation - PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation - PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation + PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation + PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
 
 						// Triple Shot
 						if (bPowerUp)
 						{
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation + PI / 18, 4));
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation - PI / 18, 4));
+							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation + PI / 18, 4));
+							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation - PI / 18, 4));
 						}
 
 						fAccumulatedTime = 0.0f;
@@ -297,21 +327,25 @@ public:
 				}
 
 				// Keep rotation within 2 PI
-				while (fRotation < 0) fRotation += TWO_PI;
-				while (fRotation > TWO_PI) fRotation -= TWO_PI;
+				while (/*fRotation*/ player.GetRotation() < 0) /*fRotation += TWO_PI;*/ player.SetRotation(player.GetRotation() + TWO_PI);
+				while (/*fRotation*/ player.GetRotation() > TWO_PI) /*fRotation -= TWO_PI;*/ player.SetRotation(player.GetRotation() - TWO_PI);
 
 				// Screen Boundaries
-				if (pos.x >= ScreenWidth()) pos.x = ScreenWidth();
+				/*if (pos.x >= ScreenWidth()) pos.x = ScreenWidth();
 				if (pos.x <= 0) pos.x = 0;
 				if (pos.y >= ScreenHeight()) pos.y = ScreenHeight();
-				if (pos.y <= 0) pos.y = 0;
+				if (pos.y <= 0) pos.y = 0;*/
+				if (player.GetPosX() >= ScreenWidth()) player.SetPosX(ScreenWidth());
+				if (player.GetPosX() <= 0) player.SetPosX(0.0f);
+				if (player.GetPosY() >= ScreenHeight()) player.SetPosY(ScreenHeight());
+				if (player.GetPosY() <= 0) player.SetPosY(0.0f);
 
 				// Draw and update enemy bullets
 				if (vEnemyBullets.size() > 0) RemoveLambda(vEnemyBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 				for (auto& bullet : vEnemyBullets)
 				{
-					MoveEntity(*bullet, fElapsedTime);
-					DrawCircle(bullet->pos, bullet->radius, olc::RED);
+					bullet->Move(fElapsedTime);
+					bullet->DrawYourself(this, false);
 
 					// Check if bullet has hit player
 				}
@@ -321,8 +355,10 @@ public:
 				for (auto& bullet : vBullets)
 				{
 					
-					MoveEntity(*bullet, fElapsedTime);
-					DrawCircle(bullet->pos, bullet->radius);
+					//MoveEntity(*bullet, fElapsedTime);
+					//DrawCircle(bullet->pos, bullet->radius);
+					bullet->Move(fElapsedTime);
+					bullet->DrawYourself(this, true);
 
 					// Check if bullet has come into contact with an enemy
 					for (auto& enemy : vEnemies)
@@ -330,8 +366,8 @@ public:
 						if (Between(bullet->pos.x, enemy->pos.x - enemy->radius, enemy->pos.x + enemy->radius) &&
 							Between(bullet->pos.y, enemy->pos.y - enemy->radius, enemy->pos.y + enemy->radius))
 						{
-							bullet->pos.x = ScreenWidth() + 1;
-							bullet->pos.y = ScreenHeight() + 1;
+							bullet->pos.x = -1;
+							bullet->pos.y = -1;
 							enemy->ReduceHP(bullet->damage);
 							enemy->isHit = true;
 						}
@@ -358,15 +394,15 @@ public:
 						continue;
 					}
 
-					enemy->SetAngleToEntity(pos);
-					MoveEntity(*enemy, fElapsedTime);
-					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : enemy->color));
-					DrawCircle(enemy->pos, enemy->radius, RandColor());
+					//enemy->SetAngleToEntity(pos);
+					enemy->SetAngleToEntity(player.GetPos());
+					enemy->Move(fElapsedTime);
+					enemy->DrawYourself(this);
 
 					if (enemy->WillFire())
 					{
-						//float angle = atan2f(pos.y - enemy->pos.y, pos.x - enemy->pos.x);
-						float angle = enemy->GetAngleToEntity(pos);
+						//float angle = enemy->GetAngleToEntity(pos);
+						float angle = enemy->GetAngleToEntity(player.GetPos());
 						vEnemyBullets.push_back(std::make_unique<Bullet>(enemy->pos, 100.0f, angle));
 					}
 
@@ -383,19 +419,22 @@ public:
 				if (vParticles.size() > 0) RemoveLambda(vParticles, [this](std::unique_ptr<Particle>& p) { return IsOffScreen(p->pos); });
 				for (auto& p : vParticles)
 				{
-					MoveEntity(*p, fElapsedTime);
-					Draw(p->pos);
+					p->Move(fElapsedTime);
+					p->DrawYourself(this);
 				}
 
 
 				// Update points of triangle ship and draw new position of player
-				rotPosRight = { pos.x - lineRay * cosf(fRotation - PI / 6), pos.y - lineRay * sinf(fRotation - PI / 6) };
+				/*rotPosRight = { pos.x - lineRay * cosf(fRotation - PI / 6), pos.y - lineRay * sinf(fRotation - PI / 6) };
 				rotPosLeft = { pos.x - lineRay * cosf(fRotation + PI / 6), pos.y - lineRay * sinf(fRotation + PI / 6) };
 				rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) };
 				DrawLine(rotPosNose, rotPosLeft);
 				DrawLine(rotPosLeft, pos);
 				DrawLine(pos, rotPosRight);
-				DrawLine(rotPosRight, rotPosNose);
+				DrawLine(rotPosRight, rotPosNose);*/
+				player.UpdateRotPositions();
+				player.DrawShip(this);
+
 
 
 				// Check if player has won
@@ -422,19 +461,18 @@ public:
 				}
 				else whiteFadeIn.a = 0;
 
-			#if DEBUGMODE
-				DrawString(5, 5, "x: " + std::to_string(pos.x));
-				DrawString(5, 15, "y: " + std::to_string(pos.y));
-				DrawString(5, 25, "a: " + std::to_string(fRotation));
-				DrawString(5, 35, "v: " + std::to_string(fVelocity));
-				std::string msg = bSingleMode ? "Single" : "Burst";
-				DrawString(5, 45, "b: " + msg);
-				DrawString(5, 55, "Bn: " + std::to_string(vBullets.size()));
-				DrawString(5, 65, "En: " + std::to_string(vEnemies.size()));
-				DrawString(5, 75, "Pn: " + std::to_string(vParticles.size()));
-				DrawString(5, 85, "da: " + std::to_string(fRotVelocity));
-				DrawString(5, 95, "Wa: " + std::to_string(whiteFadeIn.a));
-			#endif
+#if DEBUGMODE
+				DrawString(5, 5, "x: " + std::to_string(player.GetPosX()));
+				DrawString(5, 15, "y: " + std::to_string(player.GetPosY()));
+				DrawString(5, 25, "a: " + std::to_string(player.GetRotation()));
+				DrawString(5, 35, "v: " + std::to_string(player.GetVelocity()));
+
+				DrawString(5, 45, "Bn: " + std::to_string(vBullets.size()));
+				DrawString(5, 55, "En: " + std::to_string(vEnemies.size()));
+				DrawString(5, 65, "Pn: " + std::to_string(vParticles.size()));
+
+				DrawString(5, 75, "Wa: " + std::to_string(whiteFadeIn.a));
+#endif
 
 			}
 			break;
@@ -498,28 +536,26 @@ public:
 			{
 				// Draw bullets shot out
 				for (auto& bullet : vBullets)
-					DrawCircle(bullet->pos, bullet->radius);
+					bullet->DrawYourself(this, true);
 
 				// Draw enemy bullets
 				for (auto& bullet : vEnemyBullets)
-					DrawCircle(bullet->pos, bullet->radius, olc::RED);
+					bullet->DrawYourself(this, false);
 
 				// Draw enemies on screen
 				for (auto& enemy : vEnemies)
-				{
-					FillCircle(enemy->pos, enemy->radius, (enemy->isHit ? olc::YELLOW : enemy->color));
-					DrawCircle(enemy->pos, enemy->radius, RandColor());
-				}
+					enemy->DrawYourself(this);
 
 				// Draw particles and remove 
 				for (auto& p : vParticles)
-					Draw(p->pos);
+					p->DrawYourself(this);
 
 				// Draw player's ship
-				DrawLine(rotPosNose, rotPosLeft);
+				/*DrawLine(rotPosNose, rotPosLeft);
 				DrawLine(rotPosLeft, pos);
 				DrawLine(pos, rotPosRight);
-				DrawLine(rotPosRight, rotPosNose);
+				DrawLine(rotPosRight, rotPosNose);*/
+				player.DrawShip(this);
 
 				std::string ps = "PAUSE";
 				DrawString(CenterTextPosistion(ps, 2U), ps, olc::WHITE, 2U);

@@ -12,6 +12,11 @@ void Entity::SetAngleToEntity(const olc::vf2d& entityPos)
 {
 	this->angle = GetAngleToEntity(entityPos);
 }
+void Entity::Move(float elapsedTime)
+{
+	pos.x += speed * cosf(angle) * elapsedTime;
+	pos.y += speed * sinf(angle) * elapsedTime;
+}
 
 // -> Bullet
 Bullet::Bullet(olc::vf2d pos, float speed, float angle, int radius, int damage)
@@ -26,6 +31,10 @@ Bullet::Bullet(float x, float y, float speed, float angle, int radius, int damag
 	this->radius = radius;
 	this->damage = damage;
 }
+void Bullet::DrawYourself(olc::PixelGameEngine* pge, bool friendly)
+{
+	pge->DrawCircle(pos, radius, (friendly ? olc::WHITE : olc::RED));
+}
 
 // -> Enemy
 void Enemy::ReduceHP(int points)
@@ -35,6 +44,11 @@ void Enemy::ReduceHP(int points)
 bool Enemy::WillFire()
 {
 	return false;
+}
+void Enemy::DrawYourself(olc::PixelGameEngine* pge)
+{
+	pge->FillCircle(pos, radius, (isHit ? olc::YELLOW : color));
+	pge->DrawCircle(pos, radius, RandColor());
 }
 
 // -> Shooting Enemy
@@ -72,13 +86,16 @@ BruteEnemy::BruteEnemy(float x, float y, float speed, int hp, olc::vf2d offset)
 // -> Particle
 Particle::Particle(olc::vf2d pos)
 	: Particle::Particle(pos.x, pos.y) {};
-
 Particle::Particle(float x, float y)
 {
 	this->pos.x = x;
 	this->pos.y = y;
 	this->speed = rand() % 200 + 30.0f;
 	this->angle = (rand() % 360) * (PI / 180);
+}
+void Particle::DrawYourself(olc::PixelGameEngine* pge)
+{
+	pge->Draw(pos);
 }
 
 
@@ -90,6 +107,11 @@ Player::Player(float _x, float _y)
 {
 	m_pos.x = _x;
 	m_pos.y = _y;
+}
+void Player::Move(float elapsedTime)
+{
+	m_pos.y += m_fVelocity * sinf(m_fRotation) * elapsedTime;
+	m_pos.x += m_fVelocity * cosf(m_fRotation) * elapsedTime;
 }
 void Player::UpdateRotPositions()
 {
@@ -128,6 +150,26 @@ void Player::SetPos(float x, float y)
 	m_pos.x = x;
 	m_pos.y = y;
 }
+float Player::GetPosX()
+{
+	return m_pos.x;
+}
+float Player::GetPosY()
+{
+	return m_pos.y;
+}
+void Player::SetPosX(float x)
+{
+	m_pos.x = x;
+}
+void Player::SetPosY(float y)
+{
+	m_pos.y = y;
+}
+olc::vf2d Player::GetPosNose()
+{
+	return m_rotPosNose;
+}
 float Player::GetVelocity()
 {
 	return m_fVelocity;
@@ -135,6 +177,14 @@ float Player::GetVelocity()
 void Player::SetVelocity(float velocity)
 {
 	m_fVelocity = velocity;
+}
+float Player::GetMaxVelocity()
+{
+	return m_fMaxVelocity;
+}
+void Player::SetMaxVelocity(float velocity)
+{
+	m_fMaxVelocity = velocity;
 }
 float Player::GetAcceleration()
 {
