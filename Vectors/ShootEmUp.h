@@ -25,6 +25,8 @@ enum class Upgrade
 	Total_Upgrades
 };
 
+extern std::array<std::pair<std::string, std::string>, (uint32_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc;
+
 // Declarations
 class Player
 {
@@ -118,7 +120,7 @@ struct Bullet : Entity
 {
 	int radius;
 	int damage;
-
+	Bullet(const Bullet& b);
 	Bullet(olc::vf2d pos, float speed, float angle, int radius = 2, int damage = 1);
 	Bullet(float x, float y, float speed, float angle, int radius = 2, int damage = 1);
 	void DrawYourself(olc::PixelGameEngine* pge, bool friendly);
@@ -139,6 +141,7 @@ struct ShootingEnemy : Enemy
 	ShootingEnemy(olc::vf2d pos, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f });
 
 	ShootingEnemy(float x, float y, float speed, int hp, olc::vf2d offset = { 0.0f, 0.0f });
+
 	bool WillFire() override;
 };
 struct BruteEnemy : Enemy

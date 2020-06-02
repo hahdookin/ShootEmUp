@@ -10,7 +10,7 @@ float Entity::GetAngleToEntity(const olc::vf2d& entityPos)
 }
 void Entity::SetAngleToEntity(const olc::vf2d& entityPos)
 {
-	this->angle = GetAngleToEntity(entityPos);
+	this->angle = Entity::GetAngleToEntity(entityPos);
 }
 void Entity::Move(float elapsedTime)
 {
@@ -21,6 +21,12 @@ void Entity::Move(float elapsedTime)
 // -> Bullet
 Bullet::Bullet(olc::vf2d pos, float speed, float angle, int radius, int damage)
 	: Bullet::Bullet(pos.x, pos.y, speed, angle, radius, damage) {}
+
+Bullet::Bullet(const Bullet& b)
+	: Bullet::Bullet(b.pos.x, b.pos.y, b.speed, b.angle, b.radius, b.damage) 
+{
+	std::cout << "Bullet copied!\n";
+}
 
 Bullet::Bullet(float x, float y, float speed, float angle, int radius, int damage)
 {
@@ -41,7 +47,7 @@ void Enemy::ReduceHP(int points)
 {
 	this->healthPoints = (this->healthPoints - points > 0) ? this->healthPoints - points : 0;
 }
-bool Enemy::WillFire()
+bool Enemy::WillFire()  
 {
 	return false;
 }
@@ -309,7 +315,7 @@ float absmag(const olc::vf2d& v1, const olc::vf2d& v2)
 }
 
 // Keep .first to 13 chars and .second to 16 chars
-std::array<std::pair<std::string, std::string>, (size_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc =
+std::array<std::pair<std::string, std::string>, (uint32_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc =
 {
 	std::make_pair("Double Shot", "Twice the fun"),
 	std::make_pair("Triple Shot", "More guns!"),

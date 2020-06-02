@@ -31,7 +31,7 @@ public:
 	{
 		// Called once at the start, so create things here
 
-		nCurState = State::Level_Complete;
+		nCurState = State::Level;
 
 		// Populating stars
 		for (auto& s : arrStars)
@@ -66,27 +66,7 @@ public:
 
 	std::array<olc::vf2d, 1000> arrStars;
 
-	//// Starting player pos and velocity and other things
-	//olc::vf2d pos = { ScreenWidth() / 2, ScreenHeight() / 2 };
-	//olc::vf2d rotPosRight = {};
-	//olc::vf2d rotPosLeft = {};
-	//olc::vf2d rotPosNose = {};
-
-	//std::vector<Upgrade> vUpgrades = {};
-
-	//float fVelocity = 0.0f;
-	//float fAcceleration = 150.0f;
-	//float fMaxVelocity = 150.0f;
-
-	//float fRotation = 0.0f;
-	//float fRotAcceleration = 45.0f;
-	//float fRotVelocity = 0.0f;
-	//float fRotMaxVelocity = 7.0f;
-
-	//float lineRay = 15.0f; // Magnitude of triangle edges
-	//float fShotDelay = 0.3f;
-	//float fShotSpeed = 300.0f;
-
+	// Containers holding Entities on screen
 	std::vector<std::unique_ptr<Bullet>> vBullets = {};
 	std::vector<std::unique_ptr<Enemy>> vEnemies = {};
 	std::vector<std::unique_ptr<Particle>> vParticles = {};
@@ -138,6 +118,11 @@ public:
 
 	// Our beloved Player
 	Player player = Player((float)(ScreenWidth()/2), (float)(ScreenHeight()/2));
+
+	bool IsTransitioningLEFT = false;
+	bool IsTransitioningRIGHT = false;
+	bool IsTransitioningUP = false;
+	bool IsTransitioningDOWN = false;
 
 #define DEBUGMODE 1
 
@@ -206,119 +191,106 @@ public:
 #if DEBUGMODE
 				if (GetKey(olc::C).bPressed)
 				{
-					//fRotVelocity += 10.0f;
 					player.SetRotVelocity(player.GetRotVelocity() + 10.0f);
 				}
 				if (GetKey(olc::X).bPressed)
 				{
-					//fRotVelocity -= 10.0f;
 					player.SetRotVelocity(player.GetRotVelocity() - 10.0f);
 				}
 				if (GetKey(olc::N).bPressed)
 				{
-					//fShotDelay /= 2.0f;
 					player.SetShotDelay(player.GetShotDelay() / 2);
 				}
 				if (GetKey(olc::M).bHeld)
 				{
 					vEnemies.push_back(std::make_unique<BruteEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 10));
 					vEnemies.push_back(std::make_unique<ShootingEnemy>(rand() % ScreenWidth(), rand() % ScreenHeight(), 10, 10));
+					//vEnemies.push_back(ShootingEnemy(rand() % ScreenWidth(), rand() % ScreenHeight(), 10, 5));
+					//vEnemies.push_back(BruteEnemy(rand() % ScreenWidth(), rand() % ScreenHeight(), /*(rand() % 100) +*/ 10, 5));
 				}
 #endif
 
 				if (GetKey(olc::ESCAPE).bPressed) { nCurState = State::Pause; return true; }
-
+				
 				// Speed modifier
-				if (GetKey(olc::SHIFT).bHeld) /*fMaxVelocity = 250.0f;*/ player.SetMaxVelocity(250.0f);
-				else /*fMaxVelocity = 150.0f;*/ player.SetMaxVelocity(150.0f);
+				if (GetKey(olc::SHIFT).bHeld) player.SetMaxVelocity(250.0f);
+				else player.SetMaxVelocity(150.0f);
 
 				// Rotation and movement Keys
 				if (GetKey(olc::A).bHeld)
 				{
-					//if (fRotVelocity >= -fRotMaxVelocity) fRotVelocity -= fRotAcceleration * fElapsedTime;
 					if (player.GetRotVelocity() >= -player.GetRotMaxVelocity())
 						player.SetRotVelocity(player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime);
 				}
 				if (GetKey(olc::D).bHeld)
 				{
-					//if (fRotVelocity <= fRotMaxVelocity) fRotVelocity += fRotAcceleration * fElapsedTime;
 					if (player.GetRotVelocity() <= player.GetRotMaxVelocity())
 						player.SetRotVelocity(player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime);
 				}
 				if (GetKey(olc::W).bHeld)
 				{
-					//if (fVelocity >= fMaxVelocity) fVelocity -= fAcceleration * fElapsedTime; // Decrease smoothly after speed mod
-					//else if (fVelocity <= fMaxVelocity) fVelocity += fAcceleration * fElapsedTime; // Increase velocity by acceleration
 					if (player.GetVelocity() >= player.GetMaxVelocity())
-						player.SetVelocity(player.GetVelocity() - player.GetAcceleration() * fElapsedTime);
+						player.SetVelocity(player.GetVelocity() - player.GetAcceleration() * fElapsedTime); // Decrease smoothly after speed mod
 					else if (player.GetVelocity() <= player.GetMaxVelocity())
-						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime);
+						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime); // Increase velocity by acceleration
 				}
 				if (GetKey(olc::S).bHeld)
 				{
-					//if (fVelocity <= -fMaxVelocity / 2.0f) fVelocity += fAcceleration * fElapsedTime; // ... and vice versa when going backwards.
-					//else if (fVelocity >= -fMaxVelocity / 2.0f) fVelocity -= fAcceleration * fElapsedTime;
 					if (player.GetVelocity() <= -player.GetMaxVelocity() / 2.0f)
-						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime);
+						player.SetVelocity(player.GetVelocity() + player.GetAcceleration() * fElapsedTime); // ... and vice versa when going backwards.
 					else if (player.GetVelocity() >= -player.GetMaxVelocity() / 2.0f)
 						player.SetVelocity(player.GetVelocity() - player.GetAcceleration() * fElapsedTime);
 				}
-				
+
 				// Update player rotation
-				if (player.GetRotVelocity() != 0.0f)//if (fRotVelocity != 0.0f)
+				if (player.GetRotVelocity() != 0.0f)
 				{
-					//fRotation += fRotVelocity * fElapsedTime;
 					player.SetRotation(player.GetRotation() + player.GetRotVelocity() * fElapsedTime);
 				}
 
 				// Move player
-				if (player.GetVelocity() != 0.0f)//if (fVelocity != 0.0f)
+				if (player.GetVelocity() != 0.0f)
 				{
-					//pos.y += fVelocity * sinf(fRotation) * fElapsedTime;
-					//pos.x += fVelocity * cosf(fRotation) * fElapsedTime;
 					player.Move(fElapsedTime);
 				}
 
-				// Start decellerating
-				if (!GetKey(olc::W).bHeld && /*fVelocity > 0*/ player.GetVelocity() > 0.0f)
+				// Start decellerating TODO: Make these more readible someway idc how
+				if (!GetKey(olc::W).bHeld && player.GetVelocity() > 0.0f)
 					player.SetVelocity((player.GetVelocity() - player.GetAcceleration() * fElapsedTime > 0) ? player.GetVelocity() - player.GetAcceleration() * fElapsedTime : 0.0f);
-					//fVelocity = (fVelocity - fAcceleration * fElapsedTime > 0) ? fVelocity - fAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::S).bHeld && /*fVelocity < 0*/ player.GetVelocity() < 0.0f)
+				if (!GetKey(olc::S).bHeld && player.GetVelocity() < 0.0f)
 					player.SetVelocity((player.GetVelocity() + player.GetAcceleration() * fElapsedTime < 0) ? player.GetVelocity() + player.GetAcceleration() * fElapsedTime : 0.0f);
-					//fVelocity = (fVelocity + fAcceleration * fElapsedTime < 0) ? fVelocity + fAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::A).bHeld && /*fRotVelocity < 0*/ player.GetRotVelocity() < 0.0f)
+				if (!GetKey(olc::A).bHeld && player.GetRotVelocity() < 0.0f)
 					player.SetRotVelocity((player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime < 0) ? player.GetRotVelocity() + player.GetRotAcceleration() * fElapsedTime : 0.0f);
-					//fRotVelocity = (fRotVelocity + fRotAcceleration * fElapsedTime < 0) ? fRotVelocity + fRotAcceleration * fElapsedTime : 0.0f;
 
-				if (!GetKey(olc::D).bHeld && /*fRotVelocity > 0*/ player.GetRotVelocity() > 0.0f)
+				if (!GetKey(olc::D).bHeld && player.GetRotVelocity() > 0.0f)
 					player.SetRotVelocity((player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime > 0) ? player.GetRotVelocity() - player.GetRotAcceleration() * fElapsedTime : 0.0f);
-					//fRotVelocity = (fRotVelocity - fRotAcceleration * fElapsedTime > 0) ? fRotVelocity - fRotAcceleration * fElapsedTime : 0.0f;
 
 				// Shoot bullets
 				if (GetKey(olc::B).bPressed) bSingleMode = !bSingleMode;
 				if (GetKey(olc::G).bPressed) bPowerUp = !bPowerUp;
 				if (GetKey(olc::K).bPressed) bHomingShots = !bHomingShots;
+
 				if (GetKey(olc::SPACE).bHeld)
 				{
 					fAccumulatedTime += fElapsedTime;
-					if (fAccumulatedTime >= /*fShotDelay*/ player.GetShotDelay())
+					if (fAccumulatedTime >= player.GetShotDelay())
 					{
-						//rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) }; // This is just hacked together
 						olc::vf2d rotPosNose = player.GetPosNose();
 						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, fShotSpeed, fRotation, 4));
 						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
+						//vBullets.push_back(Bullet(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
 
 						// Double Shot Upgrade
-						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation - PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation - PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
-						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(fRotation + PI / 2) * 10.0f, rotPosNose.y + sinf(fRotation + PI / 2) * 10.0f, fShotSpeed, fRotation, 4));
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(player.GetRotation() - PI / 2) * 10.0f, rotPosNose.y + sinf(player.GetRotation() - PI / 2) * 10.0f, player.GetShotSpeed(), player.GetRotation(), 4));
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(player.GetRotation() + PI / 2) * 10.0f, rotPosNose.y + sinf(player.GetRotation() + PI / 2) * 10.0f, player.GetShotSpeed(), player.GetRotation(), 4));
 
 						// Triple Shot
 						if (bPowerUp)
 						{
-							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation + PI / 18, 4));
-							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, fShotSpeed, fRotation - PI / 18, 4));
+							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() + PI / 18, 4));
+							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() - PI / 18, 4));
 						}
 
 						fAccumulatedTime = 0.0f;
@@ -327,18 +299,17 @@ public:
 				}
 
 				// Keep rotation within 2 PI
-				while (/*fRotation*/ player.GetRotation() < 0) /*fRotation += TWO_PI;*/ player.SetRotation(player.GetRotation() + TWO_PI);
-				while (/*fRotation*/ player.GetRotation() > TWO_PI) /*fRotation -= TWO_PI;*/ player.SetRotation(player.GetRotation() - TWO_PI);
+				while (player.GetRotation() < 0) player.SetRotation(player.GetRotation() + TWO_PI);
+				while (player.GetRotation() > TWO_PI) player.SetRotation(player.GetRotation() - TWO_PI);
 
 				// Screen Boundaries
-				/*if (pos.x >= ScreenWidth()) pos.x = ScreenWidth();
-				if (pos.x <= 0) pos.x = 0;
-				if (pos.y >= ScreenHeight()) pos.y = ScreenHeight();
-				if (pos.y <= 0) pos.y = 0;*/
 				if (player.GetPosX() >= ScreenWidth()) player.SetPosX(ScreenWidth());
 				if (player.GetPosX() <= 0) player.SetPosX(0.0f);
 				if (player.GetPosY() >= ScreenHeight()) player.SetPosY(ScreenHeight());
 				if (player.GetPosY() <= 0) player.SetPosY(0.0f);
+
+
+
 
 				// Draw and update enemy bullets
 				if (vEnemyBullets.size() > 0) RemoveLambda(vEnemyBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
@@ -354,13 +325,9 @@ public:
 				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
 				for (auto& bullet : vBullets)
 				{
-					
-					//MoveEntity(*bullet, fElapsedTime);
-					//DrawCircle(bullet->pos, bullet->radius);
 					bullet->Move(fElapsedTime);
 					bullet->DrawYourself(this, true);
 
-					// Check if bullet has come into contact with an enemy
 					for (auto& enemy : vEnemies)
 					{
 						if (Between(bullet->pos.x, enemy->pos.x - enemy->radius, enemy->pos.x + enemy->radius) &&
@@ -377,7 +344,7 @@ public:
 						if (absmag(enemy->pos, bullet->pos) < absmag(closestEnemyPos, bullet->pos))
 						{
 							closestEnemyPos = enemy->pos;
-							if (abs(atan2f(enemy->pos.y - bullet->pos.y, enemy->pos.x - bullet->pos.x)) < PI/2.0f)
+							if (abs(atan2f(enemy->pos.y - bullet->pos.y, enemy->pos.x - bullet->pos.x)) < PI / 2.0f)
 								bullet->SetAngleToEntity(enemy->pos);
 						}
 					}
@@ -386,6 +353,7 @@ public:
 				// Draw enemies on screen and check if enemy is dead
 				for (auto& enemy : vEnemies)
 				{
+					// Check if the enemy is dead!
 					if (enemy->healthPoints == 0)
 					{
 						// Explosion
@@ -394,22 +362,20 @@ public:
 						continue;
 					}
 
-					//enemy->SetAngleToEntity(pos);
 					enemy->SetAngleToEntity(player.GetPos());
 					enemy->Move(fElapsedTime);
 					enemy->DrawYourself(this);
 
 					if (enemy->WillFire())
 					{
-						//float angle = enemy->GetAngleToEntity(pos);
 						float angle = enemy->GetAngleToEntity(player.GetPos());
 						vEnemyBullets.push_back(std::make_unique<Bullet>(enemy->pos, 100.0f, angle));
 					}
 
-					if (enemy->isHit) 
+					if (enemy->isHit)
 					{
 						for (int i = 0; i < 10; i++)
-							vParticles.push_back(std::make_unique<Particle>(enemy->pos.x, enemy->pos.y));
+							vParticles.push_back(std::make_unique<Particle>(enemy->pos));
 						enemy->isHit = false;
 					}
 				}
@@ -425,13 +391,6 @@ public:
 
 
 				// Update points of triangle ship and draw new position of player
-				/*rotPosRight = { pos.x - lineRay * cosf(fRotation - PI / 6), pos.y - lineRay * sinf(fRotation - PI / 6) };
-				rotPosLeft = { pos.x - lineRay * cosf(fRotation + PI / 6), pos.y - lineRay * sinf(fRotation + PI / 6) };
-				rotPosNose = { pos.x + lineRay * cosf(fRotation), pos.y + lineRay * sinf(fRotation) };
-				DrawLine(rotPosNose, rotPosLeft);
-				DrawLine(rotPosLeft, pos);
-				DrawLine(pos, rotPosRight);
-				DrawLine(rotPosRight, rotPosNose);*/
 				player.UpdateRotPositions();
 				player.DrawShip(this);
 
@@ -440,6 +399,73 @@ public:
 				// Check if player has won
 				if (vEnemies.size() == 0)
 				{
+
+					// WIP: This bit here does a screen transistion
+					float tranSpeed = 250.0f;
+
+					if (player.GetPosX() == 0.0f) {
+						IsTransitioningLEFT = true; 
+						player.SetVelocity(0.0f);
+					}
+					if (player.GetPosY() == 0.0f) {
+						IsTransitioningUP = true;
+						player.SetVelocity(0.0f);
+					}
+					if (player.GetPosX() == ScreenWidth()) {
+						IsTransitioningRIGHT = true;
+						player.SetVelocity(0.0f);
+					}
+					if (IsTransitioningUP)
+					{
+						player.SetPosY(player.GetPosY() + tranSpeed * fElapsedTime);
+						for (int i = 0; i < arrStars.size(); i++)
+						{
+							arrStars[i].y += ((i < 150) ? tranSpeed * 7.0f / 20.0f : (i < 500) ? tranSpeed * 8.5f / 20.0f : tranSpeed / 2.0f) * fElapsedTime;
+							if (arrStars[i].y > ScreenHeight()) arrStars[i] = { (float)(rand() % ScreenWidth()), 0.0f };
+						}
+						for (auto& bullet : vBullets)
+							bullet->pos.y += tranSpeed * fElapsedTime;
+						for (auto& bullet : vEnemyBullets)
+							bullet->pos.y += tranSpeed * fElapsedTime;
+						for (auto& particle : vParticles)
+							particle->pos.y += tranSpeed * fElapsedTime;
+					}
+					if (IsTransitioningLEFT)
+					{
+						player.SetPosX(player.GetPosX() + tranSpeed * fElapsedTime);
+						for (int i = 0; i < arrStars.size(); i++)
+						{
+							arrStars[i].x += ((i < 150) ? tranSpeed * 7.0f/20.0f : (i < 500) ? tranSpeed * 8.5f/20.0f : tranSpeed/2.0f) * fElapsedTime;
+							if (arrStars[i].x > ScreenWidth()) arrStars[i] = { 0.0f, (float)(rand() % ScreenHeight()) };
+						}
+						for (auto& bullet : vBullets)
+							bullet->pos.x += tranSpeed * fElapsedTime;
+						for (auto& bullet : vEnemyBullets)
+							bullet->pos.x += tranSpeed * fElapsedTime;
+						for (auto& particle : vParticles)
+							particle->pos.x += tranSpeed * fElapsedTime;
+					}
+					if (IsTransitioningRIGHT)
+					{
+						player.SetPosX(player.GetPosX() - tranSpeed * fElapsedTime);
+						for (int i = 0; i < arrStars.size(); i++)
+						{
+							arrStars[i].x -= ((i < 150) ? tranSpeed * 7.0f / 20.0f : (i < 500) ? tranSpeed * 8.5f / 20.0f : tranSpeed / 2.0f) * fElapsedTime;
+							if (arrStars[i].x < 0) arrStars[i] = { (float)(ScreenWidth()), (float)(rand() % ScreenHeight()) };
+						}
+						for (auto& bullet : vBullets)
+							bullet->pos.x -= tranSpeed * fElapsedTime;
+						for (auto& bullet : vEnemyBullets)
+							bullet->pos.x -= tranSpeed * fElapsedTime;
+						for (auto& particle : vParticles)
+							particle->pos.x -= tranSpeed * fElapsedTime;
+					}
+
+					if (player.GetPosX() > ScreenWidth() - 1) IsTransitioningLEFT = false;
+					if (player.GetPosY() > ScreenHeight() - 1) IsTransitioningUP = false;
+					if (player.GetPosX() < 0) IsTransitioningRIGHT = false;
+
+					
 					// Fade in 'Level Complete' text
 					std::string lc = "Level Complete";
 					FadeInPixel(whiteFadeIn, 100.0f, fElapsedTime);
@@ -452,14 +478,18 @@ public:
 
 						if (GetKey(olc::ENTER).bPressed) 
 						{ 
-							whiteFadeIn2.a = 0; 
 							GenerateRandCards(vpssCards, nCards);
+
 							nCurState = State::Level_Complete; 
 						} 
 					};
 
 				}
-				else whiteFadeIn.a = 0;
+				else 
+				{
+					whiteFadeIn.a = 0; 
+					whiteFadeIn2.a = 0;
+				}
 
 #if DEBUGMODE
 				DrawString(5, 5, "x: " + std::to_string(player.GetPosX()));
@@ -471,7 +501,8 @@ public:
 				DrawString(5, 55, "En: " + std::to_string(vEnemies.size()));
 				DrawString(5, 65, "Pn: " + std::to_string(vParticles.size()));
 
-				DrawString(5, 75, "Wa: " + std::to_string(whiteFadeIn.a));
+				DrawString(5, 75, "W1: " + std::to_string(whiteFadeIn.a));
+				DrawString(5, 85, "W2: " + std::to_string(whiteFadeIn2.a));
 #endif
 
 			}
@@ -483,8 +514,19 @@ public:
 				// Possibly level statistics etc
 
 				std::string su = "SELECT UPGRADE", pe = "PRESS ENTER";
-				DrawString(CenterTextPosistion(su, 3U, { 0.0f, (ScreenHeight()/-3.0f) }), su, olc::WHITE, 3U);
-				DrawString(CenterTextPosistion(pe, 3U, { 0.0f, (ScreenHeight() /3.0f) + 8.0f }), pe, olc::WHITE, 3U);
+				DrawString(
+					CenterTextPosistion(su, 3U, { 0.0f, (ScreenHeight() / -3.0f) }),
+					su, 
+					olc::WHITE, 
+					3U
+				);
+
+				DrawString(
+					CenterTextPosistion(pe, 3U, { 0.0f, (ScreenHeight() / 3.0f) + 8.0f }),
+					pe,
+					olc::WHITE,
+					3U
+				);
 
 				if (GetKey(olc::A).bPressed) nCardSelected--;
 				if (GetKey(olc::D).bPressed) nCardSelected++;
@@ -550,11 +592,7 @@ public:
 				for (auto& p : vParticles)
 					p->DrawYourself(this);
 
-				// Draw player's ship
-				/*DrawLine(rotPosNose, rotPosLeft);
-				DrawLine(rotPosLeft, pos);
-				DrawLine(pos, rotPosRight);
-				DrawLine(rotPosRight, rotPosNose);*/
+				//Draw player's ship
 				player.DrawShip(this);
 
 				std::string ps = "PAUSE";
