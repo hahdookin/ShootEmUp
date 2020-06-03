@@ -114,7 +114,7 @@ public:
 	// Card variables
 	uint32_t nCards = 2;
 	int nCardSelected = 0;
-	std::vector<std::pair<std::string, std::string>> vpssCards = {};
+	//std::vector<std::pair<std::string, std::string>> vpssCards = {};
 
 	// Our beloved Player
 	Player player = Player((float)(ScreenWidth()/2), (float)(ScreenHeight()/2));
@@ -123,6 +123,8 @@ public:
 	bool IsTransitioningRIGHT = false;
 	bool IsTransitioningUP = false;
 	bool IsTransitioningDOWN = false;
+
+	std::vector<std::tuple<std::string, std::string, uint32_t>> vpssCards;
 
 #define DEBUGMODE 1
 
@@ -466,6 +468,9 @@ public:
 					if (player.GetPosX() < 0) IsTransitioningRIGHT = false;
 
 					
+
+
+
 					// Fade in 'Level Complete' text
 					std::string lc = "Level Complete";
 					FadeInPixel(whiteFadeIn, 100.0f, fElapsedTime);
@@ -544,18 +549,33 @@ public:
 					if (i == nCardSelected) FillRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
 					else DrawRect(offset, ScreenHeight() / 3, ScreenWidth() / nCards, ScreenHeight() / 3);
 
+					//// Upgrade name (quite wordy function calls here)
+					//DrawString(
+					//	CenterTextCard(vpssCards[i].first, offset, nCards, scale, { 0.0f, -10.0f }),
+					//	vpssCards[i].first, 
+					//	(i == nCardSelected) ? olc::BLACK : olc::WHITE,
+					//	scale
+					//);
+
+					//// Upgrade desc
+					//DrawString(
+					//	CenterTextCard(vpssCards[i].second, offset, nCards, 1U, { 0.0f, 20.0f }),
+					//	vpssCards[i].second, 
+					//	(i == nCardSelected) ? olc::BLACK : olc::WHITE,
+					//	1U
+					//);
 					// Upgrade name (quite wordy function calls here)
 					DrawString(
-						CenterTextCard(vpssCards[i].first, offset, nCards, scale, { 0.0f, -10.0f }),
-						vpssCards[i].first, 
+						CenterTextCard(std::get<0>(vpssCards[i]), offset, nCards, scale, { 0.0f, -10.0f }),
+						std::get<0>(vpssCards[i]),
 						(i == nCardSelected) ? olc::BLACK : olc::WHITE,
 						scale
 					);
 
 					// Upgrade desc
 					DrawString(
-						CenterTextCard(vpssCards[i].second, offset, nCards, 1U, { 0.0f, 20.0f }),
-						vpssCards[i].second, 
+						CenterTextCard(std::get<1>(vpssCards[i]), offset, nCards, 1U, { 0.0f, 20.0f }),
+						std::get<1>(vpssCards[i]),
 						(i == nCardSelected) ? olc::BLACK : olc::WHITE,
 						1U
 					);
@@ -566,8 +586,11 @@ public:
 
 				if (GetKey(olc::ENTER).bPressed)
 				{
-					if (vpssCards[nCardSelected].first == "Extra Card" && nCards < (int)Upgrade::Total_Upgrades) nCards++;
-					std::cout << "Selected: " << vpssCards[nCardSelected].first << std::endl;
+					//if (vpssCards[nCardSelected].first == "Extra Card" && nCards < (int)Upgrade::Total_Upgrades) nCards++;
+					if (std::get<0>(vpssCards[nCardSelected]) == "Extra Card" && nCards < (int)Upgrade::Total_Upgrades) nCards++;
+
+					//std::cout << "Selected: " << vpssCards[nCardSelected].first << std::endl;
+					std::cout << "Selected: " << std::get<0>(vpssCards[nCardSelected]) << ", N: " << std::get<2>(vpssCards[nCardSelected]) << std::endl;
 
 					nCurState = State::Main_Screen;
 				}

@@ -7,7 +7,7 @@
 constexpr float PI = 3.14159265359f;
 constexpr float TWO_PI = PI * 2.0f;
 
-enum class Upgrade
+enum class Upgrade : uint32_t
 {
 	Double_Shot,
 	Triple_Shot,
@@ -25,7 +25,8 @@ enum class Upgrade
 	Total_Upgrades
 };
 
-extern std::array<std::pair<std::string, std::string>, (uint32_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc;
+//extern std::array<std::pair<std::string, std::string>, (uint32_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc;
+extern std::array<std::tuple<std::string, std::string, uint32_t>, (uint32_t)(Upgrade::Total_Upgrades)> arrUpgradeNameDesc;
 
 // Declarations
 class Player
@@ -61,7 +62,7 @@ public:
 	void UpdateRotPositions();
 	void DrawShip(olc::PixelGameEngine* pge);
 
-	olc::vf2d GetPos();
+	const olc::vf2d& GetPos();
 	void SetPos(olc::vf2d pos);
 	void SetPos(float x, float y);
 
@@ -71,7 +72,7 @@ public:
 	void SetPosX(float x);
 	void SetPosY(float y);
 
-	olc::vf2d GetPosNose();
+	const olc::vf2d& GetPosNose();
 
 	float GetVelocity();
 	void SetVelocity(float velocity);
@@ -161,14 +162,16 @@ struct Particle : Entity
 
 
 
-void GenerateRandCards(std::vector<std::pair<std::string, std::string>>& vCards, int nCards);
+//void GenerateRandCards(std::vector<std::pair<std::string, std::string>>& vCards, int nCards);
+void GenerateRandCards(std::vector<std::tuple<std::string, std::string, uint32_t>>& vCards, int nCards);
+
 bool Between(float n, float min, float max);
 olc::Pixel RandColor();
 void FadeInPixel(olc::Pixel& p, float speed, float elapsedTime);
 bool Between(float n, float min, float max);
 void MoveEntity(Entity& e, float elapsedTime);
 float absmag(const olc::vf2d& v1, const olc::vf2d& v2);
-void DrawStars(olc::PixelGameEngine* pge, std::array<olc::vf2d, 1000>& arr, float elapsedTime, bool update);
+void DrawStars(olc::PixelGameEngine* pge, std::array<olc::vf2d, 1000>& arr, float elapsedTime, bool update = true);
 
 
 // More concise erase remove idiom
