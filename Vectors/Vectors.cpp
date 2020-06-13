@@ -1,11 +1,10 @@
-//#define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
 #include "ShootEmUp.h"
+#include "Player.h"
 #include <string>
 #include <vector>
 #include <array>
 #include <algorithm>
-
 
 // Todo:
 // - Make a function to fade in a pixel
@@ -67,10 +66,12 @@ public:
 	std::array<olc::vf2d, 1000> arrStars;
 
 	// Containers holding Entities on screen
-	std::vector<std::unique_ptr<Bullet>> vBullets = {};
+	//std::vector<std::unique_ptr<Bullet>> vBullets = {};
 	std::vector<std::unique_ptr<Enemy>> vEnemies = {};
 	std::vector<std::unique_ptr<Particle>> vParticles = {};
 	std::vector<std::unique_ptr<Bullet>> vEnemyBullets = {};
+
+	std::vector<Bullet> vBullets = {};
 
 	bool bSingleMode = true;
 	bool bPowerUp = false;
@@ -280,19 +281,23 @@ public:
 					if (fAccumulatedTime >= player.GetShotDelay())
 					{
 						olc::vf2d rotPosNose = player.GetPosNose();
-						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, fShotSpeed, fRotation, 4));
-						vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
+
+						player.CreateBullets();
+						player.Shoot(vBullets);
+						player.EraseBullets();
+
+						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
 						//vBullets.push_back(Bullet(rotPosNose.x, rotPosNose.y, player.GetShotSpeed(), player.GetRotation(), 4));
 
 						// Double Shot Upgrade
 						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(player.GetRotation() - PI / 2) * 10.0f, rotPosNose.y + sinf(player.GetRotation() - PI / 2) * 10.0f, player.GetShotSpeed(), player.GetRotation(), 4));
 						//vBullets.push_back(std::make_unique<Bullet>(rotPosNose.x + cosf(player.GetRotation() + PI / 2) * 10.0f, rotPosNose.y + sinf(player.GetRotation() + PI / 2) * 10.0f, player.GetShotSpeed(), player.GetRotation(), 4));
-
+						
 						// Triple Shot
 						if (bPowerUp)
 						{
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() + PI / 18, 4));
-							vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() - PI / 18, 4));
+							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() + PI / 18, 4));
+							//vBullets.push_back(std::make_unique<Bullet>(rotPosNose, player.GetShotSpeed(), player.GetRotation() - PI / 18, 4));
 						}
 
 						fAccumulatedTime = 0.0f;
@@ -324,30 +329,36 @@ public:
 				}
 
 				// Draw bullets shot out also update position
-				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
+				//if (vBullets.size() > 0) RemoveLambda(vBullets, [this](std::unique_ptr<Bullet>& b) { return IsOffScreen(b->pos); });
+				if (vBullets.size() > 0) RemoveLambda(vBullets, [this](Bullet& b) { return IsOffScreen(b.pos); });
 				for (auto& bullet : vBullets)
 				{
-					bullet->Move(fElapsedTime);
-					bullet->DrawYourself(this, true);
+					/*bullet->Move(fElapsedTime);
+					bullet->DrawYourself(this, true);*/
+					bullet.Move(fElapsedTime);
+					bullet.DrawYourself(this, true);
 
 					for (auto& enemy : vEnemies)
 					{
-						if (Between(bullet->pos.x, enemy->pos.x - enemy->radius, enemy->pos.x + enemy->radius) &&
-							Between(bullet->pos.y, enemy->pos.y - enemy->radius, enemy->pos.y + enemy->radius))
+						if (Between(bullet.pos.x, enemy->pos.x - enemy->radius, enemy->pos.x + enemy->radius) &&
+							Between(bullet.pos.y, enemy->pos.y - enemy->radius, enemy->pos.y + enemy->radius))
 						{
-							bullet->pos.x = -1;
-							bullet->pos.y = -1;
-							enemy->ReduceHP(bullet->damage);
+							bullet.pos.x = -1;
+							bullet.pos.y = -1;
+							enemy->ReduceHP(bullet.damage);
 							enemy->isHit = true;
 						}
 
 						// Determine closest enemy to home in to
 						if (!bHomingShots) continue;
-						if (absmag(enemy->pos, bullet->pos) < absmag(closestEnemyPos, bullet->pos))
+						//if (absmag(enemy->pos, bullet->pos) < absmag(closestEnemyPos, bullet->pos))
+						if (absmag(enemy->pos, bullet.pos) < absmag(closestEnemyPos, bullet.pos))
 						{
 							closestEnemyPos = enemy->pos;
-							if (abs(atan2f(enemy->pos.y - bullet->pos.y, enemy->pos.x - bullet->pos.x)) < PI / 2.0f)
-								bullet->SetAngleToEntity(enemy->pos);
+							//if (abs(atan2f(enemy->pos.y - bullet->pos.y, enemy->pos.x - bullet->pos.x)) < PI / 2.0f)
+								//bullet->SetAngleToEntity(enemy->pos);
+							if (abs(atan2f(enemy->pos.y - bullet.pos.y, enemy->pos.x - bullet.pos.x)) < PI / 2.0f)
+								bullet.SetAngleToEntity(enemy->pos);
 						}
 					}
 				}
@@ -426,7 +437,7 @@ public:
 							if (arrStars[i].y > ScreenHeight()) arrStars[i] = { (float)(rand() % ScreenWidth()), 0.0f };
 						}
 						for (auto& bullet : vBullets)
-							bullet->pos.y += tranSpeed * fElapsedTime;
+							bullet.pos.y += tranSpeed * fElapsedTime;
 						for (auto& bullet : vEnemyBullets)
 							bullet->pos.y += tranSpeed * fElapsedTime;
 						for (auto& particle : vParticles)
@@ -441,7 +452,7 @@ public:
 							if (arrStars[i].x > ScreenWidth()) arrStars[i] = { 0.0f, (float)(rand() % ScreenHeight()) };
 						}
 						for (auto& bullet : vBullets)
-							bullet->pos.x += tranSpeed * fElapsedTime;
+							bullet.pos.x += tranSpeed * fElapsedTime;
 						for (auto& bullet : vEnemyBullets)
 							bullet->pos.x += tranSpeed * fElapsedTime;
 						for (auto& particle : vParticles)
@@ -456,7 +467,7 @@ public:
 							if (arrStars[i].x < 0) arrStars[i] = { (float)(ScreenWidth()), (float)(rand() % ScreenHeight()) };
 						}
 						for (auto& bullet : vBullets)
-							bullet->pos.x -= tranSpeed * fElapsedTime;
+							bullet.pos.x -= tranSpeed * fElapsedTime;
 						for (auto& bullet : vEnemyBullets)
 							bullet->pos.x -= tranSpeed * fElapsedTime;
 						for (auto& particle : vParticles)
@@ -467,7 +478,6 @@ public:
 					if (player.GetPosY() > ScreenHeight() - 1) IsTransitioningUP = false;
 					if (player.GetPosX() < 0) IsTransitioningRIGHT = false;
 
-					
 
 
 
@@ -564,6 +574,7 @@ public:
 					//	(i == nCardSelected) ? olc::BLACK : olc::WHITE,
 					//	1U
 					//);
+
 					// Upgrade name (quite wordy function calls here)
 					DrawString(
 						CenterTextCard(std::get<0>(vpssCards[i]), offset, nCards, scale, { 0.0f, -10.0f }),
@@ -591,6 +602,7 @@ public:
 
 					//std::cout << "Selected: " << vpssCards[nCardSelected].first << std::endl;
 					std::cout << "Selected: " << std::get<0>(vpssCards[nCardSelected]) << ", N: " << std::get<2>(vpssCards[nCardSelected]) << std::endl;
+					player.ApplyUpgrade(std::get<2>(vpssCards[nCardSelected]));
 
 					nCurState = State::Main_Screen;
 				}
@@ -601,7 +613,7 @@ public:
 			{
 				// Draw bullets shot out
 				for (auto& bullet : vBullets)
-					bullet->DrawYourself(this, true);
+					bullet.DrawYourself(this, true);
 
 				// Draw enemy bullets
 				for (auto& bullet : vEnemyBullets)
@@ -615,9 +627,10 @@ public:
 				for (auto& p : vParticles)
 					p->DrawYourself(this);
 
-				//Draw player's ship
+				// Draw player's ship
 				player.DrawShip(this);
 
+				// Draws the PAUSE string in the middle of the screen
 				std::string ps = "PAUSE";
 				DrawString(CenterTextPosistion(ps, 2U), ps, olc::WHITE, 2U);
 

@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="olcPixelGameEngine.cpp" />
+    <ClCompile Include="Player.cpp" />
     <ClCompile Include="ShootEmUp.cpp" />
     <ClCompile Include="Vectors.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp17</LanguageStandard>
@@ -159,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="olcPixelGameEngine.h" />
+    <ClInclude Include="Player.h" />
     <ClInclude Include="ShootEmUp.h" />
     <ClInclude Include="Upgrades.h" />
   </ItemGroup>
